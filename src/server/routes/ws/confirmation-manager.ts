@@ -3,10 +3,12 @@
  *
  * Manages the lifecycle of confirmation requests within a run.
  * Handles parallel confirmations, timeout, and cleanup.
+ *
+ * Works with ConversationEventBus + RunHandle (transport-agnostic).
  */
 
-import type { ServerWebSocket } from 'bun';
-import type { WebSocketData } from '../ws';
+import type { ConversationEventBus } from '../../events/conversation-event-bus';
+import type { RunHandle } from '../../events/conversation-event-bus';
 import {
     type ConfirmationRequest,
     type ConfirmationResponse,
@@ -14,14 +16,12 @@ import {
     CONFIRMATION_OPTIONS,
 } from '../../processor/confirmation';
 import type { PendingConfirmation } from './message-types';
-import type { RunningState } from './session-state';
 import { createChildLogger } from '../../logger';
 
 const log = createChildLogger({ component: 'confirmation-manager' });
 
 /**
  * Get the confirmation key for a request.
- * This matches the key format used in confirmation.service.ts for preferences.
  * Format: "operation" or "operation:operationType"
  */
 function getConfirmationKey(request: ConfirmationRequest): string {
@@ -30,35 +30,17 @@ function getConfirmationKey(request: ConfirmationRequest): string {
 }
 
 /**
- * Send a confirmation request message to the client
- */
-function sendConfirmationRequest(
-    ws: ServerWebSocket<WebSocketData>,
-    conversationId: string,
-    runId: string,
-    request: ConfirmationRequest
-): void {
-    ws.send(JSON.stringify({
-        type: 'confirmation_request',
-        conversationId,
-        runId,
-        data: request,
-    }));
-}
-
-/**
- * Create a confirmation callback for a WebSocket session.
- * This sends confirmation requests to the client and waits for responses.
+ * Create a confirmation callback that publishes requests to the bus.
+ * All subscribers see the request; first response wins.
  */
 export function createConfirmationCallback(
-    ws: ServerWebSocket<WebSocketData>,
+    bus: ConversationEventBus,
     conversationId: string,
-    runState: RunningState
+    runHandle: RunHandle,
 ): ConfirmationCallback {
     return async (request: ConfirmationRequest): Promise<ConfirmationResponse> => {
         return new Promise((resolve, reject) => {
-            // Store the pending confirmation with the original request
-            runState.pendingConfirmations.set(request.requestId, {
+            runHandle.pendingConfirmations.set(request.requestId, {
                 requestId: request.requestId,
                 request,
                 resolve,
@@ -69,32 +51,34 @@ export function createConfirmationCallback(
                 requestId: request.requestId,
                 title: request.title,
                 conversationId,
-                runId: runState.runId,
-                pendingCount: runState.pendingConfirmations.size,
+                runId: runHandle.runId,
+                pendingCount: runHandle.pendingConfirmations.size,
             }, 'Requesting confirmation');
 
-            // Send to client
-            sendConfirmationRequest(ws, conversationId, runState.runId, request);
+            bus.publish({
+                type: 'confirmation_request',
+                conversationId,
+                runId: runHandle.runId,
+                data: request,
+            });
         });
     };
 }
 
 /**
- * Handle a confirmation response from the client.
- *
- * When "Yes, don't ask again" is selected, this also auto-approves any other
- * pending confirmations of the same operation type (from parallel tool calls).
+ * Handle a confirmation response.
+ * When "Yes, don't ask again" is selected, auto-approves matching pending confirmations.
  */
 export function handleConfirmationResponse(
-    runState: RunningState,
-    response: ConfirmationResponse
+    runHandle: RunHandle,
+    response: ConfirmationResponse,
 ): boolean {
-    const pending = runState.pendingConfirmations.get(response.requestId);
+    const pending = runHandle.pendingConfirmations.get(response.requestId);
 
     if (!pending) {
         log.warn({
             requestId: response.requestId,
-            runId: runState.runId,
+            runId: runHandle.runId,
         }, 'Received response for unknown confirmation');
         return false;
     }
@@ -102,38 +86,32 @@ export function handleConfirmationResponse(
     log.info({
         requestId: response.requestId,
         selectedOptionId: response.selectedOptionId,
-        runId: runState.runId,
-        remainingCount: runState.pendingConfirmations.size - 1,
+        runId: runHandle.runId,
+        remainingCount: runHandle.pendingConfirmations.size - 1,
     }, 'Confirmation response received');
 
-    // Remove and resolve the specific confirmation
-    runState.pendingConfirmations.delete(response.requestId);
+    runHandle.pendingConfirmations.delete(response.requestId);
     pending.resolve(response);
 
-    // If "Yes, don't ask again" was selected, auto-approve other pending
-    // confirmations of the same operation type (from parallel tool calls)
     if (response.selectedOptionId === CONFIRMATION_OPTIONS.YES_DONT_ASK) {
         const sourceKey = getConfirmationKey(pending.request);
         const toAutoApprove: PendingConfirmation[] = [];
 
-        // Find all pending confirmations with matching confirmation key
-        for (const [requestId, otherPending] of runState.pendingConfirmations) {
-            const otherKey = getConfirmationKey(otherPending.request);
-            if (otherKey === sourceKey) {
+        for (const [, otherPending] of runHandle.pendingConfirmations) {
+            if (getConfirmationKey(otherPending.request) === sourceKey) {
                 toAutoApprove.push(otherPending);
             }
         }
 
         if (toAutoApprove.length > 0) {
             log.info({
-                runId: runState.runId,
+                runId: runHandle.runId,
                 confirmationKey: sourceKey,
                 autoApprovedCount: toAutoApprove.length,
             }, 'Auto-approving matching pending confirmations');
 
             for (const otherPending of toAutoApprove) {
-                runState.pendingConfirmations.delete(otherPending.requestId);
-                // Resolve with same "don't ask again" response
+                runHandle.pendingConfirmations.delete(otherPending.requestId);
                 otherPending.resolve({
                     requestId: otherPending.requestId,
                     selectedOptionId: CONFIRMATION_OPTIONS.YES_DONT_ASK,
@@ -148,38 +126,30 @@ export function handleConfirmationResponse(
 
 /**
  * Reject all pending confirmations for a run
- * Used when stopping a run that has blocking confirmations
  */
 export function rejectAllConfirmations(
-    runState: RunningState,
-    reason: string
+    runHandle: RunHandle,
+    reason: string,
 ): void {
-    if (runState.pendingConfirmations.size === 0) {
+    if (runHandle.pendingConfirmations.size === 0) {
         return;
     }
 
     log.info({
-        runId: runState.runId,
-        count: runState.pendingConfirmations.size,
+        runId: runHandle.runId,
+        count: runHandle.pendingConfirmations.size,
         reason,
     }, 'Rejecting all pending confirmations');
 
-    for (const [requestId, pending] of runState.pendingConfirmations) {
+    for (const [, pending] of runHandle.pendingConfirmations) {
         pending.reject(new Error(reason));
     }
-    runState.pendingConfirmations.clear();
+    runHandle.pendingConfirmations.clear();
 }
 
 /**
  * Check if there are any blocking confirmations
  */
-export function hasBlockingConfirmations(runState: RunningState): boolean {
-    return runState.pendingConfirmations.size > 0;
-}
-
-/**
- * Get count of pending confirmations
- */
-export function getPendingConfirmationCount(runState: RunningState): number {
-    return runState.pendingConfirmations.size;
+export function hasBlockingConfirmations(runHandle: RunHandle): boolean {
+    return runHandle.pendingConfirmations.size > 0;
 }

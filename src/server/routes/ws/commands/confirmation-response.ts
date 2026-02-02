@@ -2,11 +2,12 @@
  * Confirmation Response Handler
  *
  * Handles confirmation responses from the client.
+ * Routes through the ConversationEventBus.
  */
 
 import type { Command, CommandContext } from './index';
 import type { ClientMessage, ConfirmationResponseCommand } from '../message-types';
-import { getActiveRun } from '../session-state';
+import { getBus } from '../../../events/conversation-event-bus';
 import { handleConfirmationResponse } from '../confirmation-manager';
 import { createChildLogger } from '../../../logger';
 
@@ -18,31 +19,25 @@ export const ConfirmationResponseHandler: Command<ConfirmationResponseCommand> =
     },
 
     async execute(ctx: CommandContext, message: ConfirmationResponseCommand): Promise<void> {
-        const sessions = ctx.getSessions();
         const { conversationId, runId, data: response } = message;
 
-        const session = sessions.get(conversationId);
-        if (!session) {
-            log.warn({ conversationId }, 'Confirmation for unknown session');
+        const bus = getBus(conversationId);
+        if (!bus?.activeRun) {
+            log.warn({ conversationId }, 'Confirmation for unknown or inactive run');
             return;
         }
 
-        const activeRun = getActiveRun(session);
-        if (!activeRun) {
-            log.warn({ conversationId }, 'Confirmation with no active run');
-            return;
-        }
+        const runHandle = bus.activeRun;
 
-        // Verify runId matches
-        if (runId && activeRun.runId !== runId) {
+        if (runId && runHandle.runId !== runId) {
             log.warn({
                 conversationId,
                 expectedRunId: runId,
-                actualRunId: activeRun.runId,
+                actualRunId: runHandle.runId,
             }, 'Confirmation for wrong run');
             return;
         }
 
-        handleConfirmationResponse(activeRun, response);
+        handleConfirmationResponse(runHandle, response);
     },
 };

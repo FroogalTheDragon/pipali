@@ -27,6 +27,7 @@ import { setApiBaseUrl, apiFetch } from "./utils/api";
 import { generateUUID, getToolCategory, type ToolCategory } from "./utils/formatting";
 import { initNotifications, notifyConfirmationRequest, notifyTaskComplete, setNotificationClickHandler, setupFocusNavigationListener } from "./utils/notifications";
 import { isTauri, onWindowShown, onSidecarReady, listenForDeepLinks } from "./utils/tauri";
+import { isNumericIdString, trimHistoryTailAfterUser } from "./utils/chat-messages";
 
 // Components
 import { Header, Sidebar, InputArea } from "./components/layout";
@@ -72,7 +73,7 @@ const App = () => {
             .then(data => {
                 if (data?.name) setUserName(data.name.split(' ')[0]);
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     // Core state
@@ -163,6 +164,7 @@ const App = () => {
         stop,
         respondToConfirmation,
         fork,
+        observe,
         setConversationId: setChatConversationId,
         setMessages: setChatMessages,
         clearConversation,
@@ -461,6 +463,9 @@ const App = () => {
             const convState = conversationStates.get(conversationId);
             if (convState?.messages && convState.messages.length > 0) {
                 setChatMessages(convState.messages);
+                // Refresh history in the background to avoid stale cached state
+                // (especially important for automations and mid-run history opens).
+                void fetchHistory(conversationId);
             } else {
                 fetchHistory(conversationId);
             }
@@ -468,6 +473,14 @@ const App = () => {
 
         prevConversationIdRef.current = conversationId;
     }, [conversationId]);
+
+    // Observe whenever the viewed conversation or connection state changes.
+    // This is required for: multi-tab observers and automation conversations
+    // (which may not appear in the main conversations list).
+    useEffect(() => {
+        if (!conversationId || !isConnected) return;
+        observe(conversationId);
+    }, [conversationId, isConnected, observe]);
 
     const stopResearch = useCallback(() => {
         if (!isConnected || !isProcessing || !conversationId) return;
@@ -703,11 +716,12 @@ const App = () => {
                     const attachedFiles = attachMatch
                         ? attachMatch[1].split('\n').map((line: string) => line.replace(/^- /, '').split('/').pop() || '').filter(Boolean)
                         : undefined;
+                    const stepId = msg.step_id != null ? String(msg.step_id) : generateUUID();
                     historyMessages.push({
                         role: 'user',
                         content: rawContent.replace(/\n\n<attached_files>[\s\S]*?<\/attached_files>$/, ''),
-                        id: msg.step_id,
-                        stableId: msg.step_id,
+                        id: stepId,
+                        stableId: stepId,
                         attachedFiles,
                     });
                 }
@@ -715,7 +729,7 @@ const App = () => {
                 if (msg.source === 'agent') {
                     // Track first agent step_id for this message group (used for orphaned thoughts)
                     if (firstAgentStepId === null) {
-                        firstAgentStepId = msg.step_id;
+                        firstAgentStepId = msg.step_id != null ? String(msg.step_id) : generateUUID();
                     }
                     let toolResultsMap: Map<string, string> = new Map();
                     const hasMessage = msg.message && msg.message.trim() !== '';
@@ -733,8 +747,8 @@ const App = () => {
                     if (msg.observation && msg.observation.results) {
                         toolResultsMap = new Map(
                             msg.observation.results
-                            .filter((res: any) => res.source_call_id && res.content)
-                            .map((res: any) => [res.source_call_id, typeof res.content === 'string' ? res.content : JSON.stringify(res.content)])
+                                .filter((res: any) => res.source_call_id && res.content)
+                                .map((res: any) => [res.source_call_id, typeof res.content === 'string' ? res.content : JSON.stringify(res.content)])
                         );
                     }
 
@@ -760,19 +774,64 @@ const App = () => {
                         }
                     } else if (hasMessage) {
                         // No tool calls, just a message - set as currentAgentMessage
+                        const stepId = msg.step_id != null ? String(msg.step_id) : generateUUID();
                         currentAgentMessage = {
                             role: 'assistant',
                             content: msg.message,
-                            id: msg.step_id,
-                            stableId: msg.step_id,
+                            id: stepId,
+                            stableId: stepId,
                         };
                     }
                 }
             }
 
             finalizeCurrentAgent();
-            setChatMessages(historyMessages);
-            syncConversationState(id, historyMessages);
+            const shouldPreserveLiveMessage = (msg: Message): boolean => {
+                // Billing/errors etc aren't persisted
+                if (msg.billingInfo) return true;
+                // Keep in-progress streaming placeholders
+                if (msg.isStreaming) return true;
+                // Keep run-based assistant placeholders (stableId=runId UUID) even if streaming flag flipped
+                if (msg.role === 'assistant' && !isNumericIdString(msg.stableId)) return true;
+                // Keep optimistic user messages (id=clientMessageId UUID) until persisted
+                if (msg.role === 'user' && !isNumericIdString(msg.id)) return true;
+                return false;
+            };
+
+            const mergeHistoryWithLive = (history: Message[], live: Message[]): Message[] => {
+                if (live.length === 0) return history;
+                const merged = [...history];
+                const seenStableIds = new Set(history.map(m => m.stableId));
+                const seenRoleIds = new Set(history.map(m => `${m.role}:${m.id}`));
+                for (const msg of live) {
+                    if (!shouldPreserveLiveMessage(msg)) continue;
+                    const roleIdKey = `${msg.role}:${msg.id}`;
+                    if (seenStableIds.has(msg.stableId) || seenRoleIds.has(roleIdKey)) continue;
+                    merged.push(msg);
+                    seenStableIds.add(msg.stableId);
+                    seenRoleIds.add(roleIdKey);
+                }
+                return merged;
+            };
+
+            const currentConversationId = conversationIdRef.current;
+            const liveMessagesForConversation =
+                currentConversationId === id
+                    ? messagesRef.current
+                    : (conversationStatesRef.current.get(id)?.messages ?? []);
+
+            const hasActiveRunPlaceholder = liveMessagesForConversation.some(m =>
+                m.role === 'assistant' && (m.isStreaming || !isNumericIdString(m.stableId))
+            );
+            const prunedHistory = hasActiveRunPlaceholder ? trimHistoryTailAfterUser(historyMessages) : historyMessages;
+
+            const mergedMessages = mergeHistoryWithLive(prunedHistory, liveMessagesForConversation);
+
+            // Only replace the visible message list if we're still viewing this conversation.
+            if (currentConversationId === id) {
+                setChatMessages(mergedMessages);
+            }
+            syncConversationState(id, mergedMessages);
             historyLoadedConversationIdRef.current = id;
 
             // Sync model dropdown to conversation's model and cache it
@@ -919,8 +978,8 @@ const App = () => {
                 // Determine status: pending confirmation takes precedence over processing
                 const status = hasPendingConfirmation ? 'needs_input' as const
                     : state.isProcessing ? 'running' as const
-                    : state.isCompleted ? 'completed' as const
-                    : 'stopped' as const;
+                        : state.isCompleted ? 'completed' as const
+                            : 'stopped' as const;
 
                 // For completed tasks, show the final response instead of intermediate reasoning
                 const reasoning = (status === 'completed' || status === 'stopped') && assistantMsg?.content
@@ -1014,17 +1073,13 @@ const App = () => {
         if (highlightTerm) {
             pendingHighlightRef.current = { term: highlightTerm, conversationId: id };
         }
-        const convState = conversationStates.get(id);
-        if (convState?.messages && convState.messages.length > 0) {
-            setChatMessages(convState.messages);
-            // Sync model dropdown from cached model ID
-            const cachedModelId = conversationModelIds.current.get(id);
-            if (cachedModelId) {
-                const conversationModel = models.find(m => m.id === cachedModelId);
-                if (conversationModel) setSelectedModel(conversationModel);
-            }
+
+        // Sync model dropdown from cached model ID immediately; history fetch will reconcile.
+        const cachedModelId = conversationModelIds.current.get(id);
+        if (cachedModelId) {
+            const conversationModel = models.find(m => m.id === cachedModelId);
+            if (conversationModel) setSelectedModel(conversationModel);
         }
-        else fetchHistory(id);
     };
 
     const startNewConversation = () => {

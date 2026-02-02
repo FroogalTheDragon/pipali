@@ -77,11 +77,17 @@ export type ConfirmationResponseCommand = {
     data: ConfirmationResponse;
 };
 
+export type ObserveCommand = {
+    type: 'observe';
+    conversationId: string;
+};
+
 export type ClientMessage =
     | MessageCommand
     | StopCommand
     | ForkCommand
-    | ConfirmationResponseCommand;
+    | ConfirmationResponseCommand
+    | ObserveCommand;
 
 // ============================================================================
 // Server → Client
@@ -160,6 +166,7 @@ export type UserStepSavedMessage = {
     runId: string;
     clientMessageId: string;
     stepId: number;
+    message?: string;
 };
 
 export type BillingErrorMessage = {
@@ -176,6 +183,14 @@ export type CompactionMessage = {
     data: { summary: string };
 };
 
+export type ObserveStatusMessage = {
+    type: 'observe_status';
+    conversationId: string;
+    hasActiveRun: boolean;
+    runId?: string;
+    clientMessageId?: string;
+};
+
 export type ServerMessage =
     | ConversationCreatedMessage
     | RunStartedMessage
@@ -186,5 +201,5 @@ export type ServerMessage =
     | ConfirmationRequestMessage
     | UserStepSavedMessage
     | BillingErrorMessage
-    | CompactionMessage;
-
+    | CompactionMessage
+    | ObserveStatusMessage;

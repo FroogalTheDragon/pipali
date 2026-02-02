@@ -54,11 +54,20 @@ export interface ConfirmationResponseCommand {
     data: ConfirmationResponse;
 }
 
+/**
+ * Observe a conversation (subscribe to live events + replay recent)
+ */
+export interface ObserveCommand {
+    type: 'observe';
+    conversationId: string;
+}
+
 export type ClientMessage =
     | MessageCommand
     | StopCommand
     | ForkCommand
-    | ConfirmationResponseCommand;
+    | ConfirmationResponseCommand
+    | ObserveCommand;
 
 // ============================================================================
 // Server → Client Messages
@@ -160,6 +169,31 @@ export interface UserStepSavedMessage {
     runId: string;
     clientMessageId: string;
     stepId: number;
+    /** The user message text. Observers that missed the optimistic ADD_USER_MESSAGE need this. */
+    message?: string;
+}
+
+/**
+ * Compaction summary (conversation memory compaction)
+ */
+export interface CompactionMessage {
+    type: 'compaction';
+    conversationId: string;
+    runId: string;
+    data: {
+        summary: string;
+    };
+}
+
+/**
+ * Observe status response (whether a conversation currently has an active run)
+ */
+export interface ObserveStatusMessage {
+    type: 'observe_status';
+    conversationId: string;
+    hasActiveRun: boolean;
+    runId?: string;
+    clientMessageId?: string;
 }
 
 /**
@@ -189,6 +223,8 @@ export type ServerMessage =
     | StepEndMessage
     | ConfirmationRequestMessage
     | UserStepSavedMessage
+    | CompactionMessage
+    | ObserveStatusMessage
     | BillingErrorMessage;
 
 // ============================================================================

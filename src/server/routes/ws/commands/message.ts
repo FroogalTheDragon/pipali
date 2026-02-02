@@ -2,27 +2,21 @@
  * Message Command Handler
  *
  * Handles new messages from the client.
- * - If no active run: starts a new run
- * - If active run: queues as soft interrupt
+ * - If active run on bus: queues as soft interrupt on RunHandle
+ * - Otherwise: creates session for the run executor to pick up
  */
 
 import type { Command, CommandContext } from './index';
 import type { ClientMessage, MessageCommand, QueuedMessage } from '../message-types';
-import {
-    type Session,
-    createSession,
-    createRunningState,
-    hasActiveRun,
-    applyTransition,
-    getActiveRun,
-} from '../session-state';
+import { createSession, createRunningState } from '../session-state';
 import { createEmptyPreferences } from '../../../processor/confirmation';
 import { db, getDefaultChatModel, getChatModelById } from '../../../db';
 import { Conversation } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { atifConversationService } from '../../../processor/conversation/atif/atif.service';
-import { createChildLogger } from '../../../logger';
+import { getBus } from '../../../events/conversation-event-bus';
 import { rejectAllConfirmations } from '../confirmation-manager';
+import { createChildLogger } from '../../../logger';
 
 const log = createChildLogger({ component: 'message-command' });
 
@@ -46,60 +40,36 @@ export const MessageCommandHandler: Command<MessageCommand> = {
             runId,
         }, 'New message received');
 
-        // Check if there's an active session for this conversation
-        const existingSession = conversationId ? sessions.get(conversationId) : null;
+        // Check if there's an active run on the bus for this conversation
+        if (conversationId) {
+            const bus = getBus(conversationId);
+            if (bus?.activeRun) {
+                const runHandle = bus.activeRun;
 
-        if (existingSession && hasActiveRun(existingSession)) {
-            const activeRun = getActiveRun(existingSession);
-            if (!activeRun) return;
+                log.info({ conversationId, runId }, 'Soft interrupt: queuing message on bus');
 
-            // Soft interrupt: queue the message
-            log.info({
-                conversationId,
-                runId,
-            }, 'Soft interrupt: queuing message');
+                const queuedMessage: QueuedMessage = { runId, clientMessageId, message: userQuery };
+                runHandle.queuedMessages.push(queuedMessage);
+                runHandle.stopMode = 'soft';
+                runHandle.stopReason = 'soft_interrupt';
 
-            const queuedMessage: QueuedMessage = {
-                runId,
-                clientMessageId,
-                message: userQuery,
-            };
-
-            let updatedSession = applyTransition(existingSession, {
-                type: 'SOFT_INTERRUPT',
-                message: queuedMessage,
-            });
-
-            // If blocked waiting for confirmation, we cannot complete the current step.
-            // Cancel like a hard stop, but keep the queued message and mark the stop as a soft interrupt.
-            if (activeRun.pendingConfirmations.size > 0) {
-                updatedSession = applyTransition(updatedSession, {
-                    type: 'HARD_STOP',
-                    reason: 'soft_interrupt',
-                    clearQueue: false,
-                });
-                sessions.set(conversationId!, updatedSession);
-
-                const updatedRun = getActiveRun(updatedSession);
-                if (updatedRun) {
-                    updatedRun.abortController.abort();
-                    rejectAllConfirmations(updatedRun, 'Research interrupted');
+                // If blocked on confirmation, abort to unblock
+                if (runHandle.pendingConfirmations.size > 0) {
+                    runHandle.stopMode = 'hard';
+                    runHandle.abortController.abort();
+                    rejectAllConfirmations(runHandle, 'Research interrupted');
                 }
                 return;
             }
-
-            sessions.set(conversationId!, updatedSession);
-            return;
         }
 
-        // Get user
+        // No active run — start a new one
         const user = await ctx.getUser();
         if (!user) {
             ctx.sendError('User not found');
             return;
         }
 
-        // Get or create conversation, resolving the appropriate chat model
         let conversation;
         let chatModelWithApi;
 
@@ -107,14 +77,12 @@ export const MessageCommandHandler: Command<MessageCommand> = {
             const results = await db.select().from(Conversation).where(eq(Conversation.id, conversationId));
             conversation = results[0];
 
-            // Use conversation's stored model if available, otherwise fall back to user's default
             if (conversation?.chatModelId) {
                 chatModelWithApi = await getChatModelById(conversation.chatModelId) ?? await getDefaultChatModel(user);
             } else {
                 chatModelWithApi = await getDefaultChatModel(user);
             }
 
-            // Set chatModelId on existing conversation if not already set
             if (conversation && !conversation.chatModelId && chatModelWithApi) {
                 await db.update(Conversation).set({ chatModelId: chatModelWithApi.chatModel.id }).where(eq(Conversation.id, conversationId));
                 conversation.chatModelId = chatModelWithApi.chatModel.id;
@@ -144,12 +112,11 @@ export const MessageCommandHandler: Command<MessageCommand> = {
             return;
         }
 
-        // Send conversation_created if new
         if (!conversationId) {
             ctx.send({ type: 'conversation_created' }, conversation.id);
         }
 
-        // Create session with initial run state
+        // Create session for the run executor to pick up
         const session = createSession(
             conversation.id,
             user,
@@ -157,11 +124,7 @@ export const MessageCommandHandler: Command<MessageCommand> = {
             userQuery,
             conversation.chatModelId ?? undefined,
         );
-
-        // Start the run
         session.runState = createRunningState(runId, clientMessageId);
         sessions.set(conversation.id, session);
-
-        // Note: Actual research execution and run_started emission is handled by the run executor.
     },
 };

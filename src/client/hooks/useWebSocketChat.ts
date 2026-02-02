@@ -20,6 +20,7 @@ import { useReducer, useRef, useCallback, useEffect } from 'react';
 import type { Message, Thought, ConversationState, ConfirmationRequest, BillingError } from '../types';
 import { acquireWakeLock, releaseWakeLock } from '../utils/tauri';
 import { formatToolCallsForSidebar, generateUUID } from '../utils/formatting';
+import { trimHistoryTailAfterUser } from '../utils/chat-messages';
 
 // ============================================================================
 // Types
@@ -63,14 +64,15 @@ export type ChatAction =
     | { type: 'CONFIRMATION_REQUEST'; conversationId: string; runId: string; request: ConfirmationRequest }
     | { type: 'CONFIRMATION_RESPONDED'; conversationId: string; requestId: string }
     | { type: 'DISMISS_CONFIRMATION'; conversationId: string; requestId: string }
-    | { type: 'USER_STEP_SAVED'; conversationId: string; runId: string; clientMessageId: string; stepId: number }
+    | { type: 'USER_STEP_SAVED'; conversationId: string; runId: string; clientMessageId: string; stepId: number; message?: string }
     | { type: 'BILLING_ERROR'; conversationId?: string; runId?: string; error: BillingError }
     | { type: 'COMPACTION'; conversationId: string; runId: string; summary: string }
     | { type: 'CLEAR_CONVERSATION' }
     | { type: 'SYNC_CONVERSATION_STATE'; conversationId: string; messages: Message[] }
     | { type: 'REMOVE_CONVERSATION_STATE'; conversationId: string }
     | { type: 'CLEAR_CONFIRMATIONS'; conversationId: string }
-    | { type: 'CLEAR_COMPLETED'; conversationId: string };
+    | { type: 'CLEAR_COMPLETED'; conversationId: string }
+    | { type: 'OBSERVE_ACTIVE_RUN'; conversationId: string; runId?: string; clientMessageId?: string };
 
 export interface SendMessageOptions {
     clientMessageId?: string;
@@ -89,6 +91,11 @@ export interface StopOptions {
 
 function findRunAssistantIndex(messages: Message[], runId: string): number {
     return messages.findIndex(m => m.role === 'assistant' && m.stableId === runId);
+}
+
+function findStreamingRunId(messages: Message[]): string | undefined {
+    // Streaming assistant placeholders use stableId=runId (UUID) and isStreaming=true.
+    return messages.findLast(m => m.role === 'assistant' && m.isStreaming)?.stableId;
 }
 
 function stopAllStreamingAssistants(messages: Message[]): Message[] {
@@ -125,25 +132,46 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             return { ...state, isConnected: false };
 
         case 'SET_CONVERSATION_ID': {
-            // When switching conversations, restore runStatus from the target conversation's saved state
-            // Only update runStatus if the target conversation has saved state (i.e., we're switching to it)
-            // If there's no saved state (new conversation), keep the current runStatus
-            const targetState = action.id ? state.conversationStates.get(action.id) : undefined;
-            if (!targetState) {
-                // No saved state - this is likely a new conversation or one we haven't tracked yet
-                // Keep current runStatus to not interrupt ongoing operations
-                return { ...state, conversationId: action.id };
+            const id = action.id;
+            if (!id) {
+                return {
+                    ...state,
+                    conversationId: undefined,
+                    messages: [],
+                    runStatus: 'idle',
+                    currentRunId: undefined,
+                };
             }
-            const newRunStatus: RunStatus = targetState.isStopped
+
+            // Always switch the visible message list to the target conversation.
+            // If we don't yet have cached state for it, show an empty list until history loads.
+            const targetState = state.conversationStates.get(id);
+            const targetMessages = targetState?.messages ?? [];
+
+            const newRunStatus: RunStatus = targetState?.isStopped
                 ? 'stopped'
-                : targetState.isProcessing
+                : targetState?.isProcessing
                     ? 'running'
                     : 'idle';
+
+            const inferredRunId = targetState?.isProcessing ? findStreamingRunId(targetMessages) : undefined;
+
+            const conversationStates = new Map(state.conversationStates);
+            conversationStates.set(id, {
+                isProcessing: targetState?.isProcessing ?? false,
+                isStopped: targetState?.isStopped ?? false,
+                isCompleted: targetState?.isCompleted ?? false,
+                latestReasoning: targetState?.latestReasoning,
+                messages: targetMessages,
+            });
+
             return {
                 ...state,
-                conversationId: action.id,
+                conversationId: id,
+                messages: targetMessages,
                 runStatus: newRunStatus,
-                currentRunId: newRunStatus === 'running' ? state.currentRunId : undefined,
+                currentRunId: inferredRunId,
+                conversationStates,
             };
         }
 
@@ -298,6 +326,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             const existing = conversationStates.get(conversationId);
             let messages = isCurrentConversation ? state.messages : (existing?.messages || []);
 
+            // If history was loaded mid-run, we may have an extra history-derived assistant tail
+            // (thoughts-only, no content). Trim it before we add/update the live run placeholder.
+            messages = trimHistoryTailAfterUser(messages);
+
             // If server overrode the runId, re-key the optimistic streaming assistant placeholder.
             if (suggestedRunId && suggestedRunId !== runId) {
                 const rekey = (msgs: Message[]): Message[] => {
@@ -314,6 +346,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             }
 
             if (findRunAssistantIndex(messages, runId) === -1) {
+                // If we have a synthetic history "assistant-with-only-thoughts" tail, drop it so
+                // the live run placeholder + replayed events become the single source of truth.
+                messages = trimHistoryTailAfterUser(messages);
+
                 const assistant: Message = {
                     id: runId,
                     stableId: runId,
@@ -429,7 +465,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                         ...filteredMsgs,
                         {
                             id: messageId,
-                            stableId: runId,
+                            // After completion, treat the persisted step_id as the stable identifier.
+                            // This prevents "runId-based" assistant messages from sticking around and
+                            // duplicating history when reloading or viewing from another tab.
+                            stableId: messageId,
                             role: 'assistant' as const,
                             content: response,
                             isStreaming: false,
@@ -439,7 +478,7 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 }
                 const updated = filteredMsgs.map((msg, i) => {
                     if (i !== idx) return msg;
-                    return { ...msg, id: messageId, content: response, isStreaming: false };
+                    return { ...msg, id: messageId, stableId: messageId, content: response, isStreaming: false };
                 });
                 return dropEmptyStreamingPlaceholders(stopAllStreamingAssistants(updated), runId);
             };
@@ -655,14 +694,47 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             const isCurrentConversation = conversationId === state.conversationId;
             const stepIdStr = String(stepId);
 
-            const updateUserMessageId = (msgs: Message[]): Message[] => {
-                // Find the message that matches the clientMessageId
-                return msgs.map(msg => {
-                    if (msg.role === 'user' && msg.id === clientMessageId) {
-                        return { ...msg, id: stepIdStr };
-                    }
-                    return msg;
-                });
+            const updateOrCreateUserMessage = (msgs: Message[]): Message[] => {
+                // If we already have the persisted user step in history, don't duplicate it.
+                const alreadyHasPersisted = msgs.some(msg => msg.role === 'user' && (msg.id === stepIdStr || msg.stableId === stepIdStr));
+                if (alreadyHasPersisted) {
+                    if (!action.message) return msgs;
+                    const messageText = action.message;
+                    return msgs.map(msg => {
+                        if (msg.role !== 'user') return msg;
+                        if (msg.id !== stepIdStr && msg.stableId !== stepIdStr) return msg;
+                        if (msg.content) return msg;
+                        return { ...msg, content: messageText };
+                    });
+                }
+
+                const found = msgs.some(msg => msg.role === 'user' && msg.id === clientMessageId);
+                if (found) {
+                    // Optimistic message exists — remap its ID to the persisted stepId
+                    return msgs.map(msg => {
+                        if (msg.role === 'user' && msg.id === clientMessageId) {
+                            return { ...msg, id: stepIdStr };
+                        }
+                        return msg;
+                    });
+                }
+                // Observer that missed the optimistic ADD_USER_MESSAGE — create it from the event
+                if (action.message) {
+                    const userMessage: Message = {
+                        id: stepIdStr,
+                        // Use clientMessageId as a stable React key so that RUN_STARTED can
+                        // place the streaming assistant right after this message (observer case).
+                        stableId: clientMessageId,
+                        role: 'user' as const,
+                        content: action.message,
+                    };
+
+                    // Insert before the run's assistant placeholder (if present) to preserve turn order.
+                    const assistantIdx = findRunAssistantIndex(msgs, action.runId);
+                    if (assistantIdx === -1) return [...msgs, userMessage];
+                    return [...msgs.slice(0, assistantIdx), userMessage, ...msgs.slice(assistantIdx)];
+                }
+                return msgs;
             };
 
             const conversationStates = new Map(state.conversationStates);
@@ -670,13 +742,13 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             if (existing) {
                 conversationStates.set(conversationId, {
                     ...existing,
-                    messages: updateUserMessageId(existing.messages),
+                    messages: updateOrCreateUserMessage(existing.messages),
                 });
             }
 
             return {
                 ...state,
-                messages: isCurrentConversation ? updateUserMessageId(state.messages) : state.messages,
+                messages: isCurrentConversation ? updateOrCreateUserMessage(state.messages) : state.messages,
                 conversationStates,
             };
         }
@@ -751,6 +823,63 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             const pendingConfirmations = new Map(state.pendingConfirmations);
             pendingConfirmations.delete(action.conversationId);
             return { ...state, pendingConfirmations };
+        }
+
+        case 'OBSERVE_ACTIVE_RUN': {
+            const { conversationId, runId, clientMessageId } = action;
+            const isCurrentConversation = conversationId === state.conversationId;
+
+            const conversationStates = new Map(state.conversationStates);
+            const existing = conversationStates.get(conversationId);
+
+            const baseMessages = trimHistoryTailAfterUser(existing?.messages || (isCurrentConversation ? state.messages : []));
+
+            // Insert a streaming assistant placeholder if we have a runId and none exists yet
+            let updatedMessages = baseMessages;
+            const needsPlaceholder = !!runId && findRunAssistantIndex(baseMessages, runId) === -1;
+            if (needsPlaceholder && runId) {
+                const assistant: Message = {
+                    id: runId,
+                    stableId: runId,
+                    role: 'assistant',
+                    content: '',
+                    isStreaming: true,
+                    thoughts: [],
+                };
+                if (clientMessageId) {
+                    const userIndex = baseMessages.findIndex(m => m.role === 'user' && (m.id === clientMessageId || m.stableId === clientMessageId));
+                    updatedMessages = userIndex === -1
+                        ? [...baseMessages, assistant]
+                        : [...baseMessages.slice(0, userIndex + 1), assistant, ...baseMessages.slice(userIndex + 1)];
+                } else {
+                    updatedMessages = [...baseMessages, assistant];
+                }
+            }
+
+            const prevMessages = existing?.messages || (isCurrentConversation ? state.messages : []);
+            const didChangeMessages = updatedMessages !== prevMessages;
+
+            // Ensure conversation state reflects the active run.
+            // The replay events (run_started, step_start, etc.) will fill in messages.
+            if (!existing || !existing.isProcessing || didChangeMessages) {
+                conversationStates.set(conversationId, {
+                    isProcessing: true,
+                    isStopped: false,
+                    isCompleted: false,
+                    latestReasoning: existing?.latestReasoning,
+                    messages: updatedMessages,
+                });
+
+                return {
+                    ...state,
+                    runStatus: isCurrentConversation ? 'running' : state.runStatus,
+                    currentRunId: isCurrentConversation && runId ? runId : state.currentRunId,
+                    messages: isCurrentConversation ? updatedMessages : state.messages,
+                    conversationStates,
+                };
+            }
+
+            return state;
         }
 
         default:
@@ -935,6 +1064,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
                     runId,
                     clientMessageId: message.clientMessageId,
                     stepId: message.stepId,
+                    message: message.message,
                 });
                 break;
 
@@ -950,6 +1080,18 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
                     runId,
                     summary: message.data.summary,
                 });
+                break;
+
+            case 'observe_status':
+                if (message.hasActiveRun && convId) {
+                    // Server confirmed an active run — ensure our state reflects it
+                    dispatch({
+                        type: 'OBSERVE_ACTIVE_RUN',
+                        conversationId: convId,
+                        runId: message.runId,
+                        clientMessageId: message.clientMessageId,
+                    });
+                }
                 break;
         }
     }, []);
@@ -1086,6 +1228,15 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         }));
     }, []);
 
+    const observe = useCallback((conversationId: string) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+        wsRef.current.send(JSON.stringify({
+            type: 'observe',
+            conversationId,
+        }));
+    }, []);
+
     const setConversationId = useCallback((id: string | undefined) => {
         dispatch({ type: 'SET_CONVERSATION_ID', id });
     }, []);
@@ -1131,6 +1282,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         stop,
         respondToConfirmation,
         fork,
+        observe,
         setConversationId,
         setMessages,
         clearConversation,
@@ -1144,3 +1296,9 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         wsRef,
     };
 }
+
+// Exposed for unit tests (reducer behavior is easier to validate directly).
+export const __test__ = {
+    chatReducer,
+    initialState,
+};

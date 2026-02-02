@@ -33,6 +33,8 @@ export interface CommandContext {
     send: (message: Record<string, unknown>, conversationId: string) => void;
     /** Send error to client */
     sendError: (error: string, conversationId?: string) => void;
+    /** Track a bus subscription for cleanup on disconnect */
+    addSubscription: (conversationId: string, unsubscribe: () => void) => void;
 }
 
 // ============================================================================
@@ -59,3 +61,4 @@ export { MessageCommandHandler } from './message';
 export { StopCommandHandler } from './stop';
 export { ForkCommandHandler } from './fork';
 export { ConfirmationResponseHandler } from './confirmation-response';
+export { ObserveCommandHandler } from './observe';
