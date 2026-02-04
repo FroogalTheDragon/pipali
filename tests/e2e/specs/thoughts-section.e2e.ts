@@ -170,27 +170,23 @@ test.describe('Train of Thought Section', () => {
         // Wait for processing to start
         await chatPage.waitForProcessing();
 
-        // Wait a moment for thoughts to accumulate
-        await page.waitForTimeout(1000);
+        // Wait for thoughts section to appear and expand during processing
+        await chatPage.waitForThoughts();
+        await chatPage.expandThoughts();
+        expect(await chatPage.isThoughtsExpanded()).toBe(true);
 
-        // Expand thoughts during processing
-        if (await chatPage.thoughtsSection.isVisible()) {
-            await chatPage.expandThoughts();
-            expect(await chatPage.isThoughtsExpanded()).toBe(true);
+        const initialCount = await chatPage.getThoughtCount();
 
-            const initialCount = await chatPage.getThoughtCount();
+        // Wait for more thoughts
+        await page.waitForTimeout(1500);
 
-            // Wait for more thoughts
-            await page.waitForTimeout(1500);
+        // Dropdown should still be expanded after new steps arrived
+        expect(await chatPage.isThoughtsExpanded()).toBe(true);
 
-            // Dropdown should still be expanded after new steps arrived
-            expect(await chatPage.isThoughtsExpanded()).toBe(true);
+        const laterCount = await chatPage.getThoughtCount();
 
-            const laterCount = await chatPage.getThoughtCount();
-
-            // Should have accumulated more (or at least not decreased)
-            expect(laterCount).toBeGreaterThanOrEqual(initialCount);
-        }
+        // Should have accumulated more (or at least not decreased)
+        expect(laterCount).toBeGreaterThanOrEqual(initialCount);
 
         // Wait for completion
         await chatPage.waitForAssistantResponse();

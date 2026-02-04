@@ -9,11 +9,10 @@
 import { findMatchingScenario, defaultMockScenarios, type MockScenario } from './fixtures/mock-llm';
 import type { ResponseWithThought } from '../../src/server/processor/conversation/conversation';
 
-// Track mock state per scenario (for multi-iteration scenarios)
-const scenarioState = new Map<string, { currentIteration: number }>();
+type MockCtx = { sessionId?: string };
 
-// Track the last query to detect new conversations
-let lastQuery = '';
+// Track mock state per session+scenario+query so multiple conversations can run concurrently.
+const scenarioState = new Map<string, { currentIteration: number }>();
 
 // Parse scenarios from environment if provided
 function getScenarios(): MockScenario[] {
@@ -31,10 +30,15 @@ function getScenarios(): MockScenario[] {
 const scenarios = getScenarios();
 console.log(`[MockPreload] Loaded ${scenarios.length} mock scenarios`);
 
+function getStateKey(query: string, scenarioName: string, ctx?: MockCtx): string {
+    const sessionId = ctx?.sessionId ?? 'no-session';
+    return `${sessionId}::${scenarioName}::${query}`;
+}
+
 /**
  * Generate mock response based on query and scenario
  */
-function getMockResponse(query: string): ResponseWithThought {
+function getMockResponse(query: string, ctx?: MockCtx): ResponseWithThought {
     const scenario = findMatchingScenario(query, scenarios);
 
     if (!scenario) {
@@ -48,19 +52,17 @@ function getMockResponse(query: string): ResponseWithThought {
 
     console.log(`[MockLLM] Matched scenario: ${scenario.name} for query: "${query}"`);
 
-    // Get or initialize scenario state
-    let state = scenarioState.get(scenario.name);
+    const key = getStateKey(query, scenario.name, ctx);
+    const sessionId = ctx?.sessionId;
 
-    // If this is a new query (different from last), reset the scenario state
-    // This ensures each new conversation starts fresh
-    if (query !== lastQuery) {
-        console.log(`[MockLLM] New query detected, resetting scenario state for: ${scenario.name}`);
+    // Get or initialize scenario state for this session/query
+    let state = scenarioState.get(key);
+    if (!state) {
+        if (sessionId) {
+            console.log(`[MockLLM] Initializing state for session: ${sessionId} scenario: ${scenario.name}`);
+        }
         state = { currentIteration: 0 };
-        scenarioState.set(scenario.name, state);
-        lastQuery = query;
-    } else if (!state) {
-        state = { currentIteration: 0 };
-        scenarioState.set(scenario.name, state);
+        scenarioState.set(key, state);
     }
 
     const iterations = scenario.iterations;
@@ -68,9 +70,7 @@ function getMockResponse(query: string): ResponseWithThought {
     // If we've exhausted iterations, return final response
     if (state.currentIteration >= iterations.length) {
         console.log(`[MockLLM] Scenario ${scenario.name} complete, returning final response`);
-        // Reset for next conversation
-        scenarioState.delete(scenario.name);
-        lastQuery = ''; // Clear to allow fresh start
+        scenarioState.delete(key);
         return {
             message: scenario.finalResponse,
             raw: [],
@@ -115,7 +115,6 @@ function getMockResponse(query: string): ResponseWithThought {
  */
 function resetMockState() {
     scenarioState.clear();
-    lastQuery = '';
     console.log('[MockLLM] State reset');
 }
 

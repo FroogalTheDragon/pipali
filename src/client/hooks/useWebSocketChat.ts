@@ -89,6 +89,82 @@ export interface StopOptions {
 // Helpers
 // ============================================================================
 
+const CONVERSATION_STATE_STORAGE_KEY = 'pipali.conversationStates.v1';
+const MAX_PERSISTED_CONVERSATIONS = 25;
+const MAX_PERSISTED_MESSAGES_PER_CONVERSATION = 50;
+
+type PersistedConversationState = {
+    isProcessing: boolean;
+    isStopped: boolean;
+    isCompleted: boolean;
+    latestReasoning?: string;
+    messages: Message[];
+};
+
+type PersistedPayloadV1 = {
+    v: 1;
+    savedAt: number;
+    entries: Array<[string, PersistedConversationState]>;
+};
+
+function loadConversationStatesFromStorage(): Map<string, ConversationState> {
+    if (typeof window === 'undefined') return new Map();
+    try {
+        const raw = window.localStorage.getItem(CONVERSATION_STATE_STORAGE_KEY);
+        if (!raw) return new Map();
+
+        const parsed = JSON.parse(raw) as PersistedPayloadV1;
+        if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.entries)) return new Map();
+
+        const conversationStates = new Map<string, ConversationState>();
+        for (const entry of parsed.entries) {
+            if (!Array.isArray(entry) || entry.length !== 2) continue;
+            const [conversationId, state] = entry;
+            if (typeof conversationId !== 'string' || !state) continue;
+            if (!Array.isArray(state.messages)) continue;
+
+            conversationStates.set(conversationId, {
+                isProcessing: !!state.isProcessing,
+                isStopped: !!state.isStopped,
+                isCompleted: !!state.isCompleted,
+                latestReasoning: typeof state.latestReasoning === 'string' ? state.latestReasoning : undefined,
+                messages: state.messages,
+            });
+        }
+        return conversationStates;
+    } catch {
+        return new Map();
+    }
+}
+
+function persistConversationStatesToStorage(conversationStates: Map<string, ConversationState>): void {
+    if (typeof window === 'undefined') return;
+    try {
+        const entries: Array<[string, PersistedConversationState]> = [];
+        for (const [conversationId, state] of conversationStates.entries()) {
+            const shouldPersist = state.isProcessing || state.isStopped || state.isCompleted;
+            if (!shouldPersist) continue;
+
+            entries.push([
+                conversationId,
+                {
+                    isProcessing: state.isProcessing,
+                    isStopped: state.isStopped,
+                    isCompleted: state.isCompleted,
+                    latestReasoning: state.latestReasoning,
+                    messages: state.messages.slice(-MAX_PERSISTED_MESSAGES_PER_CONVERSATION),
+                },
+            ]);
+        }
+
+        const trimmed = entries.slice(-MAX_PERSISTED_CONVERSATIONS);
+        const payload: PersistedPayloadV1 = { v: 1, savedAt: Date.now(), entries: trimmed };
+        window.localStorage.setItem(CONVERSATION_STATE_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+        // ignore storage failures (quota/private mode)
+    }
+}
+
 function findRunAssistantIndex(messages: Message[], runId: string): number {
     return messages.findIndex(m => m.role === 'assistant' && m.stableId === runId);
 }
@@ -461,6 +537,22 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 const filteredMsgs = msgs.filter(msg => !msg.billingInfo);
                 const idx = findRunAssistantIndex(filteredMsgs, runId);
                 if (idx === -1) {
+                    // Idempotency: observe replay or reconnects can deliver RUN_COMPLETE multiple times.
+                    // If we've already finalized this assistant message (keyed by persisted stepId),
+                    // update in place instead of appending a duplicate.
+                    const alreadyFinalizedIdx = filteredMsgs.findIndex(m =>
+                        m.role === 'assistant' && (m.id === messageId || m.stableId === messageId)
+                    );
+                    if (alreadyFinalizedIdx !== -1) {
+                        const updated = filteredMsgs.map((msg, i) => {
+                            if (i !== alreadyFinalizedIdx) return msg;
+                            // Preserve stableId for the same reason as the main completion case:
+                            // avoid remounting the assistant message UI on duplicate RUN_COMPLETE deliveries.
+                            return { ...msg, id: messageId, content: response, isStreaming: false };
+                        });
+                        return dropEmptyStreamingPlaceholders(stopAllStreamingAssistants(updated), runId);
+                    }
+
                     const next = [
                         ...filteredMsgs,
                         {
@@ -478,7 +570,9 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 }
                 const updated = filteredMsgs.map((msg, i) => {
                     if (i !== idx) return msg;
-                    return { ...msg, id: messageId, stableId: messageId, content: response, isStreaming: false };
+                    // Preserve stableId to avoid remounting the message UI (e.g., ThoughtsSection expansion state)
+                    // when the server provides the persisted stepId on completion.
+                    return { ...msg, id: messageId, content: response, isStreaming: false };
                 });
                 return dropEmptyStreamingPlaceholders(stopAllStreamingAssistants(updated), runId);
             };
@@ -537,9 +631,22 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             const updateMessagesWithThoughts = (msgs: Message[]): Message[] => {
                 const idx = findRunAssistantIndex(msgs, runId);
                 if (idx === -1) return msgs;
+                const assistant = msgs[idx];
+                if (!assistant) return msgs;
+
+                // Dedupe tool call thoughts by stable tool_call_id to avoid duplicating
+                // history-loaded steps when the server replays events after a reload.
+                const existingThoughtIds = new Set((assistant.thoughts || []).map(t => t.id));
+                const dedupedNewThoughts = newThoughts.filter(t => {
+                    if (t.type !== 'tool_call') return true;
+                    return !existingThoughtIds.has(t.id);
+                });
+
+                if (dedupedNewThoughts.length === 0) return msgs;
+
                 return msgs.map((msg, i) => {
                     if (i !== idx) return msg;
-                    return { ...msg, thoughts: [...(msg.thoughts || []), ...newThoughts] };
+                    return { ...msg, thoughts: [...(msg.thoughts || []), ...dedupedNewThoughts] };
                 });
             };
 
@@ -926,8 +1033,13 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         shouldActivateConversationOnCreate,
     } = options;
 
-    const [state, dispatch] = useReducer(chatReducer, initialState);
+    const [state, dispatch] = useReducer(
+        chatReducer,
+        initialState,
+        (init) => ({ ...init, conversationStates: loadConversationStatesFromStorage() }),
+    );
     const wsRef = useRef<WebSocket | null>(null);
+    const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const callbacksRef = useRef<Pick<
         UseWebSocketChatOptions,
@@ -963,6 +1075,20 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         onError,
         shouldActivateConversationOnCreate,
     ]);
+
+    useEffect(() => {
+        if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = setTimeout(() => {
+            persistConversationStatesToStorage(state.conversationStates);
+        }, 250);
+
+        return () => {
+            if (persistTimeoutRef.current) {
+                clearTimeout(persistTimeoutRef.current);
+                persistTimeoutRef.current = null;
+            }
+        };
+    }, [state.conversationStates]);
 
     // Handle incoming messages
     const handleMessage = useCallback((message: any) => {

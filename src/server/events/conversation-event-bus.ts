@@ -103,7 +103,22 @@ export class ConversationEventBus {
     }
 
     getReplayEvents(): ConversationEvent[] {
-        return [...this.recentEvents];
+        // Replay exists to let late observers catch up on an in-flight run.
+        // If there's no active run, clients should rely on persisted history instead.
+        // Replaying old run events after completion can cause duplicate UI updates.
+        if (!this.activeRun) return [];
+
+        // Don't replay confirmations that are no longer actionable.
+        // If a confirmation was already responded to, it will have been removed
+        // from the active run's pendingConfirmations map. Replaying it would
+        // cause the UI to re-show an already-acknowledged dialog/toast after reload.
+        const pending = this.activeRun.pendingConfirmations;
+
+        return this.recentEvents.filter(e => {
+            if (e.type !== 'confirmation_request') return true;
+            const requestId = (e as any)?.data?.requestId;
+            return typeof requestId === 'string' && pending.has(requestId);
+        });
     }
 
     private maybeCleanup(): void {

@@ -185,7 +185,6 @@ export const websocketHandler = {
 
     open(ws: ServerWebSocket<WebSocketData>) {
         log.info('Client connected');
-        globalThis.__pipaliMockReset?.();
         getConnectionContext(ws);
     },
 

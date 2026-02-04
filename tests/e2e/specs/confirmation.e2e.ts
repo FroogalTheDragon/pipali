@@ -39,6 +39,12 @@ test.describe('Confirmation Dialogs', () => {
             const pillText = await operationPill.textContent();
             expect(pillText?.toLowerCase()).toContain('read');
         }
+
+        // Cleanup: close the dialog so this test doesn't leave an active run blocked on confirmation.
+        await chatPage.clickConfirmationButton('no');
+        await chatPage.confirmationDialog.waitFor({ state: 'hidden', timeout: 5000 });
+        await chatPage.waitForAssistantResponse();
+        await chatPage.waitForIdle();
     });
 
     test('should accept confirmation and continue task', async () => {
