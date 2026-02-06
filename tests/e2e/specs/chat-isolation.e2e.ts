@@ -7,8 +7,12 @@
 
 import { test, expect } from '@playwright/test';
 import { ChatPage, HomePage } from '../helpers/page-objects';
+import { stopAllActiveRunsFromHome } from '../helpers/cleanup';
 
 test.describe('Chat Isolation', () => {
+    test.afterEach(async ({ page }) => {
+        await stopAllActiveRunsFromHome(page);
+    });
     test('should show empty chat body and focused input on new chat', async ({ page }) => {
         const chatPage = new ChatPage(page);
         await chatPage.goto();
@@ -167,8 +171,9 @@ test.describe('Chat Isolation', () => {
         await homePage.goto();
 
         // Start a slow background task
-        await homePage.sendBackgroundMessage('analyze my codebase slowly');
-        await homePage.waitForTaskCount(1);
+        const backgroundQuery = `analyze my codebase slowly [e2e-${Date.now()}]`;
+        await homePage.sendBackgroundMessage(backgroundQuery);
+        await homePage.waitForTaskWithTitle(backgroundQuery);
 
         // Now start a foreground conversation
         await homePage.sendMessage('quick hello');
@@ -195,6 +200,16 @@ test.describe('Chat Isolation', () => {
         // We should still be on the same conversation
         const currentConvId = await chatPage.getConversationId();
         expect(currentConvId).toBe(foregroundConvId);
+
+        // Cleanup: wait for the background run to finish so it doesn't leak into other tests.
+        await chatPage.goHome();
+        await homePage.waitForConnection();
+        const bgCard = homePage.getTaskCardByTitle(backgroundQuery);
+        if (await bgCard.isVisible()) {
+            await bgCard.click();
+            await chatPage.waitForAssistantResponse();
+            await chatPage.waitForIdle();
+        }
     });
 
     test('should preserve thoughts when switching conversations', async ({ page }) => {
@@ -314,7 +329,8 @@ test.describe('Chat Isolation', () => {
         // Now navigate back to the original conversation and verify it completed there
         await page.goto(`/?conversationId=${runningConvId}`);
         await chatPage.waitForConnection();
-        await page.waitForTimeout(1000);
+        await chatPage.waitForAssistantResponse();
+        await chatPage.waitForIdle();
 
         // The original conversation should have the response
         const originalMessageCount = await chatPage.getMessageCount();
@@ -356,7 +372,8 @@ test.describe('Chat Isolation', () => {
         // Navigate back to verify original conversation has the response
         await page.goto(`/?conversationId=${runningConvId}`);
         await chatPage.waitForConnection();
-        await page.waitForTimeout(1000);
+        await chatPage.waitForAssistantResponse();
+        await chatPage.waitForIdle();
 
         const originalCount = await chatPage.getMessageCount();
         expect(originalCount.user).toBe(1);

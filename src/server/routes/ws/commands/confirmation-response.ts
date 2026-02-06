@@ -38,6 +38,18 @@ export const ConfirmationResponseHandler: Command<ConfirmationResponseCommand> =
             return;
         }
 
-        handleConfirmationResponse(runHandle, response);
+        const resolvedIds = handleConfirmationResponse(runHandle, response);
+        for (const requestId of resolvedIds) {
+            bus.publish({
+                type: 'confirmation_resolved',
+                conversationId,
+                runId: runHandle.runId,
+                data: {
+                    requestId,
+                    selectedOptionId: response.selectedOptionId,
+                    timestamp: response.timestamp,
+                },
+            });
+        }
     },
 };

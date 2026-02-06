@@ -64,6 +64,7 @@ export type ChatAction =
     | { type: 'CONFIRMATION_REQUEST'; conversationId: string; runId: string; request: ConfirmationRequest }
     | { type: 'CONFIRMATION_RESPONDED'; conversationId: string; requestId: string }
     | { type: 'DISMISS_CONFIRMATION'; conversationId: string; requestId: string }
+    | { type: 'MESSAGE_DELETED'; conversationId: string; role: 'user' | 'assistant'; stepId: number }
     | { type: 'USER_STEP_SAVED'; conversationId: string; runId: string; clientMessageId: string; stepId: number; message?: string }
     | { type: 'BILLING_ERROR'; conversationId?: string; runId?: string; error: BillingError }
     | { type: 'COMPACTION'; conversationId: string; runId: string; summary: string }
@@ -72,6 +73,7 @@ export type ChatAction =
     | { type: 'REMOVE_CONVERSATION_STATE'; conversationId: string }
     | { type: 'CLEAR_CONFIRMATIONS'; conversationId: string }
     | { type: 'CLEAR_COMPLETED'; conversationId: string }
+    | { type: 'CLEAR_STOPPED'; conversationId: string }
     | { type: 'OBSERVE_ACTIVE_RUN'; conversationId: string; runId?: string; clientMessageId?: string };
 
 export interface SendMessageOptions {
@@ -90,8 +92,10 @@ export interface StopOptions {
 // ============================================================================
 
 const CONVERSATION_STATE_STORAGE_KEY = 'pipali.conversationStates.v1';
+const PENDING_CONFIRMATIONS_STORAGE_KEY = 'pipali.pendingConfirmations.v1';
 const MAX_PERSISTED_CONVERSATIONS = 25;
 const MAX_PERSISTED_MESSAGES_PER_CONVERSATION = 50;
+const MAX_PERSISTED_CONFIRMATIONS_PER_CONVERSATION = 10;
 
 type PersistedConversationState = {
     isProcessing: boolean;
@@ -105,6 +109,12 @@ type PersistedPayloadV1 = {
     v: 1;
     savedAt: number;
     entries: Array<[string, PersistedConversationState]>;
+};
+
+type PersistedPendingConfirmationsV1 = {
+    v: 1;
+    savedAt: number;
+    entries: Array<[string, ChatPendingConfirmation[]]>;
 };
 
 function loadConversationStatesFromStorage(): Map<string, ConversationState> {
@@ -132,6 +142,42 @@ function loadConversationStatesFromStorage(): Map<string, ConversationState> {
             });
         }
         return conversationStates;
+    } catch {
+        return new Map();
+    }
+}
+
+function loadPendingConfirmationsFromStorage(): Map<string, ChatPendingConfirmation[]> {
+    if (typeof window === 'undefined') return new Map();
+    try {
+        const raw = window.localStorage.getItem(PENDING_CONFIRMATIONS_STORAGE_KEY);
+        if (!raw) return new Map();
+
+        const parsed = JSON.parse(raw) as PersistedPendingConfirmationsV1;
+        if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.entries)) return new Map();
+
+        const pending = new Map<string, ChatPendingConfirmation[]>();
+        for (const entry of parsed.entries) {
+            if (!Array.isArray(entry) || entry.length !== 2) continue;
+            const [conversationId, queue] = entry;
+            if (typeof conversationId !== 'string') continue;
+            if (!Array.isArray(queue)) continue;
+
+            const sanitized: ChatPendingConfirmation[] = [];
+            for (const item of queue) {
+                const runId = (item as any)?.runId;
+                const request = (item as any)?.request;
+                const requestId = request?.requestId;
+                if (typeof runId !== 'string') continue;
+                if (!request || typeof request !== 'object') continue;
+                if (typeof requestId !== 'string') continue;
+                sanitized.push({ runId, request });
+                if (sanitized.length >= MAX_PERSISTED_CONFIRMATIONS_PER_CONVERSATION) break;
+            }
+
+            if (sanitized.length > 0) pending.set(conversationId, sanitized);
+        }
+        return pending;
     } catch {
         return new Map();
     }
@@ -165,6 +211,24 @@ function persistConversationStatesToStorage(conversationStates: Map<string, Conv
     }
 }
 
+function persistPendingConfirmationsToStorage(pendingConfirmations: Map<string, ChatPendingConfirmation[]>): void {
+    if (typeof window === 'undefined') return;
+    try {
+        const entries: Array<[string, ChatPendingConfirmation[]]> = [];
+
+        for (const [conversationId, queue] of pendingConfirmations.entries()) {
+            if (!Array.isArray(queue) || queue.length === 0) continue;
+            entries.push([conversationId, queue.slice(-MAX_PERSISTED_CONFIRMATIONS_PER_CONVERSATION)]);
+        }
+
+        const trimmed = entries.slice(-MAX_PERSISTED_CONVERSATIONS);
+        const payload: PersistedPendingConfirmationsV1 = { v: 1, savedAt: Date.now(), entries: trimmed };
+        window.localStorage.setItem(PENDING_CONFIRMATIONS_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+        // ignore storage failures
+    }
+}
+
 function findRunAssistantIndex(messages: Message[], runId: string): number {
     return messages.findIndex(m => m.role === 'assistant' && m.stableId === runId);
 }
@@ -192,6 +256,26 @@ function dropEmptyStreamingPlaceholders(messages: Message[], keepRunId?: string)
         const hasThoughts = (m.thoughts?.length ?? 0) > 0;
         return hasContent || hasThoughts;
     });
+    return next.length === messages.length ? messages : next;
+}
+
+function deleteTurnFromMessages(messages: Message[], stepId: number): Message[] {
+    const idx = messages.findIndex(m => m.role === 'user' && m.id === String(stepId));
+    if (idx === -1) return messages;
+
+    let endIdx = idx;
+    for (let i = idx + 1; i < messages.length; i++) {
+        if (messages[i]?.role === 'assistant') {
+            endIdx = i;
+            break;
+        }
+    }
+    return [...messages.slice(0, idx), ...messages.slice(endIdx + 1)];
+}
+
+function deleteAssistantMessageFromMessages(messages: Message[], stepId: number): Message[] {
+    const stepIdStr = String(stepId);
+    const next = messages.filter(m => !(m.role === 'assistant' && m.id === stepIdStr));
     return next.length === messages.length ? messages : next;
 }
 
@@ -926,6 +1010,15 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             return { ...state, conversationStates };
         }
 
+        case 'CLEAR_STOPPED': {
+            const conversationStates = new Map(state.conversationStates);
+            const existing = conversationStates.get(action.conversationId);
+            if (existing?.isStopped) {
+                conversationStates.set(action.conversationId, { ...existing, isStopped: false });
+            }
+            return { ...state, conversationStates };
+        }
+
         case 'CLEAR_CONFIRMATIONS': {
             const pendingConfirmations = new Map(state.pendingConfirmations);
             pendingConfirmations.delete(action.conversationId);
@@ -989,6 +1082,31 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             return state;
         }
 
+        case 'MESSAGE_DELETED': {
+            const { conversationId, role, stepId } = action;
+            const isCurrentConversation = conversationId === state.conversationId;
+
+            const applyDeletion = (msgs: Message[]): Message[] => {
+                if (role === 'assistant') return deleteAssistantMessageFromMessages(msgs, stepId);
+                return deleteTurnFromMessages(msgs, stepId);
+            };
+
+            const conversationStates = new Map(state.conversationStates);
+            const existing = conversationStates.get(conversationId);
+            if (existing) {
+                conversationStates.set(conversationId, {
+                    ...existing,
+                    messages: applyDeletion(existing.messages),
+                });
+            }
+
+            return {
+                ...state,
+                messages: isCurrentConversation ? applyDeletion(state.messages) : state.messages,
+                conversationStates,
+            };
+        }
+
         default:
             return state;
     }
@@ -1036,9 +1154,14 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
     const [state, dispatch] = useReducer(
         chatReducer,
         initialState,
-        (init) => ({ ...init, conversationStates: loadConversationStatesFromStorage() }),
+        (init) => ({
+            ...init,
+            conversationStates: loadConversationStatesFromStorage(),
+            pendingConfirmations: loadPendingConfirmationsFromStorage(),
+        }),
     );
     const wsRef = useRef<WebSocket | null>(null);
+    const observedConversationsRef = useRef<Set<string>>(new Set());
     const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const callbacksRef = useRef<Pick<
@@ -1080,6 +1203,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
         persistTimeoutRef.current = setTimeout(() => {
             persistConversationStatesToStorage(state.conversationStates);
+            persistPendingConfirmationsToStorage(state.pendingConfirmations);
         }, 250);
 
         return () => {
@@ -1088,7 +1212,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
                 persistTimeoutRef.current = null;
             }
         };
-    }, [state.conversationStates]);
+    }, [state.conversationStates, state.pendingConfirmations]);
 
     // Handle incoming messages
     const handleMessage = useCallback((message: any) => {
@@ -1183,6 +1307,27 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
                 onConfirmationRequestCb?.(message.data, convId, runId);
                 break;
 
+            case 'confirmation_resolved':
+                if (convId && typeof message.data?.requestId === 'string') {
+                    dispatch({
+                        type: 'CONFIRMATION_RESPONDED',
+                        conversationId: convId,
+                        requestId: message.data.requestId,
+                    });
+                }
+                break;
+
+            case 'message_deleted':
+                if (convId && message.data && typeof message.data.stepId === 'number') {
+                    dispatch({
+                        type: 'MESSAGE_DELETED',
+                        conversationId: convId,
+                        role: message.data.role === 'assistant' ? 'assistant' : 'user',
+                        stepId: message.data.stepId,
+                    });
+                }
+                break;
+
             case 'user_step_saved':
                 dispatch({
                     type: 'USER_STEP_SAVED',
@@ -1209,7 +1354,8 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
                 break;
 
             case 'observe_status':
-                if (message.hasActiveRun && convId) {
+                if (!convId) break;
+                if (message.hasActiveRun) {
                     // Server confirmed an active run — ensure our state reflects it
                     dispatch({
                         type: 'OBSERVE_ACTIVE_RUN',
@@ -1217,6 +1363,10 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
                         runId: message.runId,
                         clientMessageId: message.clientMessageId,
                     });
+                } else {
+                    // If the server reports no active run, any locally persisted confirmations
+                    // for this conversation are stale (they're only relevant while the run is active).
+                    dispatch({ type: 'CLEAR_CONFIRMATIONS', conversationId: convId });
                 }
                 break;
         }
@@ -1232,6 +1382,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
 
         ws.onclose = () => {
             dispatch({ type: 'CONNECTION_CLOSED' });
+            observedConversationsRef.current.clear();
             setTimeout(connect, 3000);
         };
 
@@ -1254,6 +1405,28 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
             wsRef.current?.close();
         };
     }, [connect]);
+
+    // Auto-observe locally-known in-flight runs so reloads restore live updates
+    // (including pending confirmation requests) without requiring navigation.
+    useEffect(() => {
+        if (!state.isConnected) return;
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+        const candidates = new Set<string>();
+        for (const [conversationId, convState] of state.conversationStates.entries()) {
+            if (convState.isProcessing) candidates.add(conversationId);
+        }
+        for (const conversationId of state.pendingConfirmations.keys()) {
+            candidates.add(conversationId);
+        }
+
+        for (const conversationId of candidates) {
+            if (observedConversationsRef.current.has(conversationId)) continue;
+            observedConversationsRef.current.add(conversationId);
+            ws.send(JSON.stringify({ type: 'observe', conversationId }));
+        }
+    }, [state.isConnected, state.conversationStates, state.pendingConfirmations]);
 
     // Actions
     const sendMessage = useCallback((content: string, conversationId?: string, options?: SendMessageOptions) => {
@@ -1391,6 +1564,10 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         dispatch({ type: 'CLEAR_COMPLETED', conversationId });
     }, []);
 
+    const clearStopped = useCallback((conversationId: string) => {
+        dispatch({ type: 'CLEAR_STOPPED', conversationId });
+    }, []);
+
     const dismissConfirmation = useCallback((conversationId: string, requestId: string) => {
         dispatch({ type: 'DISMISS_CONFIRMATION', conversationId, requestId });
     }, []);
@@ -1415,6 +1592,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         syncConversationState,
         removeConversationState,
         clearCompleted,
+        clearStopped,
         clearConfirmations,
         dismissConfirmation,
 

@@ -134,6 +134,9 @@ const App = () => {
     const messagesRef = useRef<Message[]>([]);
     // Track isConnected for callbacks that may close over stale state
     const isConnectedRef = useRef(false);
+    // When on home page, observe active conversations so confirmations and live state
+    // (e.g., needs_input) can appear without opening the conversation.
+    const observedActiveConversationsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         automationConfirmationsRef.current = automationConfirmations;
@@ -171,6 +174,7 @@ const App = () => {
         syncConversationState,
         removeConversationState,
         clearCompleted,
+        clearStopped,
         clearConfirmations,
         dismissConfirmation,
     } = useWebSocketChat({
@@ -278,6 +282,12 @@ const App = () => {
 
     useEffect(() => {
         isConnectedRef.current = isConnected;
+    }, [isConnected]);
+
+    useEffect(() => {
+        if (!isConnected) {
+            observedActiveConversationsRef.current.clear();
+        }
     }, [isConnected]);
 
     // Initialize data fetching - wait for sidecar to be ready in desktop mode
@@ -481,6 +491,32 @@ const App = () => {
         if (!conversationId || !isConnected) return;
         observe(conversationId);
     }, [conversationId, isConnected, observe]);
+
+    useEffect(() => {
+        if (!isConnected) return;
+        if (currentPage !== 'home') return;
+
+        // Observe conversations that might need live updates on Home:
+        // - server-reported active runs (conversations[].isActive)
+        // - locally persisted in-flight runs (conversationStates.isProcessing)
+        //
+        // This is important for confirmation toasts on reload: pending confirmations
+        // aren't persisted, so Home must re-observe the conversation to receive
+        // the replayed confirmation_request event.
+        const idsToObserve = new Set<string>();
+        for (const conv of conversations) {
+            if (conv.isActive) idsToObserve.add(conv.id);
+        }
+        for (const [convId, state] of conversationStates.entries()) {
+            if (state.isProcessing) idsToObserve.add(convId);
+        }
+
+        for (const convId of idsToObserve) {
+            if (observedActiveConversationsRef.current.has(convId)) continue;
+            observedActiveConversationsRef.current.add(convId);
+            observe(convId);
+        }
+    }, [currentPage, conversations, conversationStates, isConnected, observe]);
 
     const stopResearch = useCallback(() => {
         if (!isConnected || !isProcessing || !conversationId) return;
@@ -1065,8 +1101,9 @@ const App = () => {
         if (conversationId) {
             syncConversationState(conversationId, messages);
         }
-        // Clear completed flag so the task no longer shows on home page
+        // Clear completed/stopped flags so the task no longer shows on home page
         clearCompleted(id);
+        clearStopped(id);
         conversationIdRef.current = id;
         setChatConversationId(id);
         // Store highlight term to open FindInPage once messages render

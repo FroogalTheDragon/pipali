@@ -10,6 +10,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdir, rm } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import net from 'net';
 import type { MockScenario } from './mock-llm';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +48,8 @@ export class TestServer {
 
     async start(): Promise<void> {
         console.log(`[TestServer] Starting on ${this.host}:${this.port}...`);
+
+        await assertPortFree(this.host, this.port);
 
         // Create isolated skills directory for testing
         await mkdir(this.skillsDir, { recursive: true });
@@ -162,6 +165,24 @@ export class TestServer {
     getPort(): number {
         return this.port;
     }
+}
+
+async function assertPortFree(host: string, port: number): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+        const server = net.createServer();
+        server.unref();
+        server.once('error', (err: NodeJS.ErrnoException) => {
+            server.close();
+            if (err.code === 'EADDRINUSE') {
+                reject(new Error(`[TestServer] Port ${host}:${port} is already in use. Stop the existing server and re-run E2E tests.`));
+                return;
+            }
+            reject(err);
+        });
+        server.listen(port, host, () => {
+            server.close(() => resolve());
+        });
+    });
 }
 
 // Singleton instance for global setup/teardown

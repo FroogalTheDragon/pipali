@@ -161,6 +161,34 @@ export interface ConfirmationRequestMessage {
 }
 
 /**
+ * Confirmation resolved (by any client)
+ * Lets other observers dismiss dialogs/toasts for already-answered confirmations.
+ */
+export interface ConfirmationResolvedMessage {
+    type: 'confirmation_resolved';
+    conversationId: string;
+    runId: string;
+    data: {
+        requestId: string;
+        selectedOptionId: string;
+        timestamp?: string;
+    };
+}
+
+/**
+ * Message deleted (by any client/device)
+ * Used to synchronize deletions across multiple observers without forcing a full history reload.
+ */
+export interface MessageDeletedMessage {
+    type: 'message_deleted';
+    conversationId: string;
+    data: {
+        stepId: number;
+        role: 'user' | 'assistant';
+    };
+}
+
+/**
  * User message saved to DB
  */
 export interface UserStepSavedMessage {
@@ -222,6 +250,8 @@ export type ServerMessage =
     | StepStartMessage
     | StepEndMessage
     | ConfirmationRequestMessage
+    | ConfirmationResolvedMessage
+    | MessageDeletedMessage
     | UserStepSavedMessage
     | CompactionMessage
     | ObserveStatusMessage

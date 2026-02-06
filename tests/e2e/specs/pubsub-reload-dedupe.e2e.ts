@@ -14,7 +14,9 @@ import { test, expect, type Page } from '@playwright/test';
 import { ChatPage, HomePage } from '../helpers/page-objects';
 import { Selectors } from '../helpers/selectors';
 
-const REPRO_QUERY = 'repro pubsub reload';
+function makeReproQuery(): string {
+    return `repro pubsub reload ${Date.now()}`;
+}
 
 async function assertNoDuplicateThoughtMarkers(page: Page) {
     const markers = [
@@ -35,12 +37,13 @@ async function assertNoDuplicateThoughtMarkers(page: Page) {
 
 test.describe('Pub-sub Reload Dedupe', () => {
     test('chat reload mid-run does not duplicate steps or re-show acknowledged confirmation', async ({ page }) => {
+        const reproQuery = makeReproQuery();
         const chatPage = new ChatPage(page);
         await chatPage.goto();
         await chatPage.startNewChat();
         await chatPage.waitForConnection();
 
-        await chatPage.sendMessage(REPRO_QUERY);
+        await chatPage.sendMessage(reproQuery);
         await chatPage.waitForProcessing();
 
         // Step 1 is confirmation-gated (shell_command)
@@ -69,30 +72,31 @@ test.describe('Pub-sub Reload Dedupe', () => {
     });
 
     test('home reload mid-run does not duplicate steps or re-show acknowledged confirmation toast', async ({ page }) => {
+        const reproQuery = makeReproQuery();
         const homePage = new HomePage(page);
         await homePage.goto();
 
         // Start as a background task so confirmations show as toasts on home.
-        await homePage.sendBackgroundMessage(REPRO_QUERY);
-        await homePage.waitForTaskCount(1);
+        await homePage.sendBackgroundMessage(reproQuery);
+        await homePage.waitForTaskWithTitle(reproQuery);
 
-        const toast = page.locator(Selectors.confirmationToast).first();
+        const toast = page.locator(Selectors.confirmationToast, { hasText: reproQuery }).first();
         await toast.waitFor({ state: 'visible', timeout: 15000 });
 
         // Click "Yes" on the toast confirmation
         await toast.locator('.toast-actions .toast-btn.primary').click();
-        await expect(page.locator(Selectors.confirmationToast)).toHaveCount(0, { timeout: 15000 });
+        await expect(page.locator(Selectors.confirmationToast, { hasText: reproQuery })).toHaveCount(0, { timeout: 15000 });
 
         // Ensure the confirmation was actually acknowledged by the server
         // (the task should move past "Needs Input" and progress beyond step 1).
-        const firstCard = page.locator(Selectors.taskCard).first();
+        const firstCard = page.locator(Selectors.taskCard, { hasText: reproQuery }).first();
         await expect(firstCard).toBeVisible();
         await expect(firstCard.locator('.task-status-text.needs-input')).toHaveCount(0, { timeout: 15000 });
         // Ensure it's still active (not completed immediately) so reload happens mid-run.
         await expect(firstCard.locator('.task-status-text.running')).toBeVisible({ timeout: 15000 });
 
         // Open the conversation (to capture the conversationId reliably)
-        await homePage.clickTaskCard(0);
+        await firstCard.click();
         const chatPage = new ChatPage(page);
         await chatPage.waitForConnection();
         const conversationId = await chatPage.getConversationId();
@@ -104,7 +108,7 @@ test.describe('Pub-sub Reload Dedupe', () => {
         // Navigate back to home, then reload the home page mid-run
         await chatPage.goHome();
         await homePage.waitForConnection();
-        await expect(page.locator(Selectors.taskCard)).toHaveCount(1);
+        await expect(page.locator(Selectors.taskCard, { hasText: reproQuery })).toBeVisible();
 
         await page.reload();
         await homePage.waitForConnection();

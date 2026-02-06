@@ -16,7 +16,7 @@ function makeState(params: {
     };
 }
 
-test('RUN_COMPLETE maps assistant stableId to persisted stepId', () => {
+test('RUN_COMPLETE preserves assistant stableId but updates persisted id', () => {
     const conversationId = 'c1';
     const runId = 'run-1';
 
@@ -50,8 +50,8 @@ test('RUN_COMPLETE maps assistant stableId to persisted stepId', () => {
 
     expect(next.messages).toHaveLength(1);
     expect(next.messages[0]?.id).toBe('42');
-    expect(next.messages[0]?.stableId).toBe('42');
-    expect(next.conversationStates.get(conversationId)?.messages[0]?.stableId).toBe('42');
+    expect(next.messages[0]?.stableId).toBe(runId);
+    expect(next.conversationStates.get(conversationId)?.messages[0]?.stableId).toBe(runId);
 });
 
 test('RUN_COMPLETE appends assistant with stepId stableId when missing', () => {

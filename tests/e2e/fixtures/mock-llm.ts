@@ -417,7 +417,7 @@ export function pubSubReloadReproScenario(): MockScenario {
     return {
         name: 'pubsub-reload-repro',
         // Keep this pattern extremely specific so it never matches other tests
-        queryPattern: '^repro pubsub reload$',
+        queryPattern: '^repro pubsub reload(\\s+.+)?$',
         iterations: [
             {
                 thought: 'Step 1: Request permission to run a read-only command.',

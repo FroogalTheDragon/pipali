@@ -20,6 +20,32 @@ test.describe('Run Lifecycle', () => {
         await chatPage.goto();
     });
 
+    test.afterEach(async () => {
+        // Cleanup: never leave a run executing across tests (server continues runs even if client disconnects).
+        try {
+            if (await chatPage.confirmationDialog.isVisible()) {
+                await chatPage.clickConfirmationButton('no');
+                await chatPage.confirmationDialog.waitFor({ state: 'hidden', timeout: 15000 });
+            }
+        } catch {
+            // ignore
+        }
+
+        try {
+            if (await chatPage.isProcessing()) {
+                await chatPage.stopTask();
+            }
+        } catch {
+            // ignore
+        }
+
+        try {
+            await chatPage.waitForIdle();
+        } catch {
+            // ignore
+        }
+    });
+
     test.describe('Normal Run Flow', () => {
         test('single message creates a run with proper lifecycle events', async ({ page }) => {
             // Send a message that triggers tool calls
@@ -199,6 +225,10 @@ test.describe('Run Lifecycle', () => {
             // Sidebar should show active task marker
             await chatPage.waitForActiveTaskInSidebar();
             expect(await chatPage.hasActiveTaskInSidebar()).toBe(true);
+
+            // Cleanup: allow the run to finish so it doesn't leak into other tests.
+            await chatPage.waitForAssistantResponse();
+            await chatPage.waitForIdle();
         });
 
         test('sidebar active marker disappears on completion', async () => {
@@ -232,6 +262,10 @@ test.describe('Run Lifecycle', () => {
             // Subtitle should show reasoning
             const subtitle = await chatPage.getConversationSubtitleFromSidebar();
             expect(subtitle.length).toBeGreaterThan(0);
+
+            // Cleanup: allow the run to finish so it doesn't leak into other tests.
+            await chatPage.waitForAssistantResponse();
+            await chatPage.waitForIdle();
         });
     });
 
@@ -276,6 +310,7 @@ test.describe('Run Lifecycle', () => {
             expect(postRefreshConvId).toBe(convId);
 
             // Should not be stuck processing after refresh/disconnect.
+            await chatPage.waitForAssistantResponse();
             await chatPage.waitForIdle();
         });
 

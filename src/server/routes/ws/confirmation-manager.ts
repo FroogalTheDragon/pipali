@@ -72,7 +72,7 @@ export function createConfirmationCallback(
 export function handleConfirmationResponse(
     runHandle: RunHandle,
     response: ConfirmationResponse,
-): boolean {
+): string[] {
     const pending = runHandle.pendingConfirmations.get(response.requestId);
 
     if (!pending) {
@@ -80,7 +80,7 @@ export function handleConfirmationResponse(
             requestId: response.requestId,
             runId: runHandle.runId,
         }, 'Received response for unknown confirmation');
-        return false;
+        return [];
     }
 
     log.info({
@@ -92,6 +92,7 @@ export function handleConfirmationResponse(
 
     runHandle.pendingConfirmations.delete(response.requestId);
     pending.resolve(response);
+    const resolvedIds: string[] = [response.requestId];
 
     if (response.selectedOptionId === CONFIRMATION_OPTIONS.YES_DONT_ASK) {
         const sourceKey = getConfirmationKey(pending.request);
@@ -112,6 +113,7 @@ export function handleConfirmationResponse(
 
             for (const otherPending of toAutoApprove) {
                 runHandle.pendingConfirmations.delete(otherPending.requestId);
+                resolvedIds.push(otherPending.requestId);
                 otherPending.resolve({
                     requestId: otherPending.requestId,
                     selectedOptionId: CONFIRMATION_OPTIONS.YES_DONT_ASK,
@@ -121,7 +123,7 @@ export function handleConfirmationResponse(
         }
     }
 
-    return true;
+    return resolvedIds;
 }
 
 /**
