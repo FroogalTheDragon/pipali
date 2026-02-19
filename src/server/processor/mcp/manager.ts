@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'os';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { McpServer } from '../../db/schema';
@@ -122,6 +125,7 @@ export async function getMcpToolDefinitions(): Promise<ToolDefinition[]> {
                     schema: augmentedSchema,
                 });
             }
+
         } catch (error) {
             log.error({ err: error, server: client.serverName }, 'Failed to get tools from MCP server');
         }
@@ -243,7 +247,14 @@ export async function executeMcpTool(
     }
 
     // Extract operation_type from args (agent must provide this)
-    const operationType = args.operation_type as 'safe' | 'unsafe' | undefined;
+    let operationType = args.operation_type as 'safe' | 'unsafe' | undefined;
+
+    // For evaluate_script_file, the _safe.js / _unsafe.js suffix is authoritative
+    if (toolName === 'evaluate_script_file' && serverName === 'chrome-browser') {
+        const filePath = args.file_path as string | undefined;
+        const suffixType = filePath?.match(/_(?<type>safe|unsafe)\.js$/)?.groups?.type as 'safe' | 'unsafe' | undefined;
+        if (suffixType) operationType = suffixType;
+    }
 
     // Check if confirmation is required based on server's confirmation mode and operation type
     const needsConfirmation = shouldRequireConfirmation(client.confirmationMode, operationType);
@@ -273,8 +284,19 @@ export async function executeMcpTool(
     // Remove operation_type from args before passing to MCP server (it's not part of the actual tool schema)
     const { operation_type: _, ...toolArgs } = args;
 
+    // Translate synthetic tools to their real MCP counterparts before execution
+    let realToolName = toolName;
+    let realToolArgs = toolArgs;
+    if (toolName === 'evaluate_script_file' && serverName === 'chrome-browser') {
+        try {
+            [realToolName, realToolArgs] = await translateScriptFileArgs(toolArgs);
+        } catch (err) {
+            return `Error executing MCP tool ${namespacedName}: ${err instanceof Error ? err.message : String(err)}`;
+        }
+    }
+
     // Execute the tool
-    const result = await client.runTool(toolName, toolArgs);
+    const result = await client.runTool(realToolName, realToolArgs);
 
     if (!result.success) {
         let errorMessage = `Error executing MCP tool ${namespacedName}: ${result.error}`;
@@ -342,6 +364,36 @@ export async function closeMcpClients(): Promise<void> {
 
     await Promise.allSettled(closePromises);
     activeClients.clear();
+}
+
+/**
+ * Translate evaluate_script_file args into evaluate_script args.
+ * Reads the JS file from disk and returns the real tool name + args
+ * so the standard executeMcpTool flow handles confirmation, errors, etc.
+ */
+async function translateScriptFileArgs(
+    args: Record<string, unknown>
+): Promise<[string, Record<string, unknown>]> {
+    const filePath = args.file_path as string;
+    if (!filePath) throw new Error('evaluate_script_file: file_path is required');
+
+    // Resolve ~ and relative paths
+    const resolvedPath = filePath.startsWith('~')
+        ? path.join(os.homedir(), filePath.slice(1))
+        : path.resolve(filePath);
+
+    // Read the script from disk
+    const scriptContent = await fs.readFile(resolvedPath, 'utf-8');
+
+    // chrome-devtools-mcp expects a function declaration string.
+    // Wrap bare scripts that aren't already a function expression.
+    const isWrapped = /^\s*(\(\s*\)|async\s*\(\s*\)|function[\s(])/.test(scriptContent);
+    const functionString = isWrapped ? scriptContent : `() => {\n${scriptContent}\n}`;
+
+    log.debug(`evaluate_script_file: running ${resolvedPath} (${scriptContent.length} bytes)`);
+
+    const { file_path: _, ...rest } = args;
+    return ['evaluate_script', { ...rest, function: functionString }];
 }
 
 /**
