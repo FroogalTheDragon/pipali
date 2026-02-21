@@ -24,7 +24,7 @@ import { useFocusManagement, useFileDrop, useModels, useSidecar, useWebSocketCha
 
 // Utils
 import { setApiBaseUrl, apiFetch } from "./utils/api";
-import { generateUUID, getToolCategory, type ToolCategory } from "./utils/formatting";
+import { generateUUID, generateDeterministicId, getToolCategory, type ToolCategory } from "./utils/formatting";
 import { initNotifications, notifyConfirmationRequest, notifyTaskComplete, setNotificationClickHandler, setupFocusNavigationListener } from "./utils/notifications";
 import { isTauri, onWindowShown, onSidecarReady, listenForDeepLinks } from "./utils/tauri";
 import { isNumericIdString, trimHistoryTailAfterUser } from "./utils/chat-messages";
@@ -738,10 +738,11 @@ const App = () => {
                     if (msg.extra?.is_compaction === true) {
                         // Add compaction summary as a thought for the next agent message
                         const summaryContent = typeof msg.message === 'string' ? msg.message : JSON.stringify(msg.message);
+                        const content = `**Compact Context.**\n${summaryContent}`;
                         thoughts.push({
                             type: 'thought',
-                            content: `**Compact Context**\n${summaryContent}`,
-                            id: generateUUID(),
+                            content: content,
+                            id: generateDeterministicId('compaction', content),
                             isInternalThought: true,
                         });
                         continue;
@@ -774,7 +775,7 @@ const App = () => {
                         thoughts.push({
                             type: 'thought',
                             content: msg.reasoning_content,
-                            id: generateUUID(),
+                            id: generateDeterministicId('thought', msg.reasoning_content),
                             isInternalThought: true,
                         });
                     }
@@ -795,7 +796,7 @@ const App = () => {
                             thoughts.push({
                                 type: 'thought',
                                 content: msg.message,
-                                id: generateUUID(),
+                                id: generateDeterministicId('thought', msg.message),
                             });
                         }
                         for (const tc of msg.tool_calls) {

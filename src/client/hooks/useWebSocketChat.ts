@@ -19,7 +19,7 @@
 import { useReducer, useRef, useCallback, useEffect } from 'react';
 import type { Message, Thought, ConversationState, ConfirmationRequest, BillingError } from '../types';
 import { acquireWakeLock, releaseWakeLock } from '../utils/tauri';
-import { formatToolCallsForSidebar, generateUUID } from '../utils/formatting';
+import { formatToolCallsForSidebar, generateUUID, generateDeterministicId } from '../utils/formatting';
 import { trimHistoryTailAfterUser } from '../utils/chat-messages';
 
 // ============================================================================
@@ -695,9 +695,9 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
             // Add reasoning thought if present
             if (reasoning && toolCalls?.length > 0) {
-                newThoughts.push({ id: generateUUID(), type: 'thought', content: reasoning });
+                newThoughts.push({ id: generateDeterministicId('thought', reasoning), type: 'thought', content: reasoning });
             } else if (thought) {
-                newThoughts.push({ id: generateUUID(), type: 'thought', content: thought, isInternalThought: true });
+                newThoughts.push({ id: generateDeterministicId('thought', thought), type: 'thought', content: thought, isInternalThought: true });
             }
 
             // Add pending tool calls
@@ -718,13 +718,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 const assistant = msgs[idx];
                 if (!assistant) return msgs;
 
-                // Dedupe tool call thoughts by stable tool_call_id to avoid duplicating
+                // Dedupe thoughts and tool calls by stable ID to avoid duplicating
                 // history-loaded steps when the server replays events after a reload.
                 const existingThoughtIds = new Set((assistant.thoughts || []).map(t => t.id));
-                const dedupedNewThoughts = newThoughts.filter(t => {
-                    if (t.type !== 'tool_call') return true;
-                    return !existingThoughtIds.has(t.id);
-                });
+                const dedupedNewThoughts = newThoughts.filter(t => !existingThoughtIds.has(t.id));
 
                 if (dedupedNewThoughts.length === 0) return msgs;
 
@@ -806,10 +803,11 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             const isCurrentConversation = conversationId === state.conversationId;
 
             // Add compaction as an internal thought to the current assistant message
+            const content = `**Compact Context.**\n${summary}`;
             const compactionThought: Thought = {
-                id: generateUUID(),
+                id: generateDeterministicId('compaction', content),
                 type: 'thought',
-                content: `**Compact Context.**\n${summary}`,
+                content: content,
                 isInternalThought: true,
             };
 
@@ -818,6 +816,9 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 if (idx === -1) return msgs;
                 return msgs.map((msg, i) => {
                     if (i !== idx) return msg;
+                    // Dedupe compaction summary by stable ID
+                    const existingThoughtIds = new Set((msg.thoughts || []).map(t => t.id));
+                    if (existingThoughtIds.has(compactionThought.id)) return msg;
                     return { ...msg, thoughts: [...(msg.thoughts || []), compactionThought] };
                 });
             };

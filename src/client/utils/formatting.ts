@@ -422,3 +422,17 @@ export function generateUUID(): string {
         });
     }
 }
+
+/**
+ * Generates a stable ID based on string content.
+ * Uses a simple, fast 32-bit hash with string length to reduce collisions.
+ * Based on Java's String.hashCode but with unsigned remap (>>> 0).
+ */
+export function generateDeterministicId(prefix: string, content: string): string {
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+        hash = ((hash << 5) - hash) + content.charCodeAt(i);
+    }
+    // Append string length to get ~43 bit (vs 32) collision resistance
+    return `${prefix}-${hash >>> 0}-${content.length}`;
+}
