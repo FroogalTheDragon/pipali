@@ -92,12 +92,14 @@ async function checkRateLimits(automation: typeof Automation.$inferSelect): Prom
 }
 
 /**
- * Queue an automation for execution
+ * Queue an automation for execution.
+ * Returns executionId and conversationId, or null if the automation
+ * cannot run (not found, inactive, rate-limited).
  */
 export async function queueExecution(
     automationId: string,
     triggerData: TriggerEventData
-): Promise<string | null> {
+): Promise<{ executionId: string; conversationId: string } | null> {
     log.info(`Queuing execution for ${automationId}`);
 
     // Get automation to check rate limits
@@ -120,6 +122,16 @@ export async function queueExecution(
     if (!withinLimits) {
         return null;
     }
+
+    // Ensure conversation exists before queuing so callers always get a conversationId
+    const [user] = await db.select()
+        .from(User)
+        .where(eq(User.id, automation.userId));
+    if (!user) {
+        log.error(`User not found for: ${automationId}`);
+        return null;
+    }
+    const conversationId = await getOrCreateAutomationConversation(automation, user);
 
     // Create execution record
     const insertResult = await db.insert(AutomationExecution)
@@ -145,7 +157,7 @@ export async function queueExecution(
     // Process queue (non-blocking)
     processQueue();
 
-    return execution.id;
+    return { executionId: execution.id, conversationId };
 }
 
 /**

@@ -161,7 +161,6 @@ export function AutomationDetailModal({
     const [isTriggering, setIsTriggering] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [triggerSuccess, setTriggerSuccess] = useState(false);
 
     // Confirmation guidance state
     const [showGuidanceInput, setShowGuidanceInput] = useState(false);
@@ -211,20 +210,18 @@ export function AutomationDetailModal({
     const handleTrigger = async () => {
         setIsTriggering(true);
         setError(null);
-        setTriggerSuccess(false);
 
         try {
             const res = await apiFetch(`/api/automations/${automation.id}/trigger`, {
                 method: 'POST',
             });
+            const data = await res.json();
 
             if (res.ok) {
-                setTriggerSuccess(true);
-                onUpdated();
-                // Clear success message after 3 seconds
-                setTimeout(() => setTriggerSuccess(false), 3000);
+                if (onViewConversation) {
+                    onViewConversation(data.conversationId);
+                }
             } else {
-                const data = await res.json();
                 setError(data.error || 'Failed to trigger routine');
             }
         } catch (e) {
@@ -699,7 +696,7 @@ export function AutomationDetailModal({
                                     className="btn-secondary"
                                 >
                                     <MessageSquare size={16} />
-                                    <span>View History</span>
+                                    <span>View</span>
                                 </button>
                             )}
                             <button
@@ -741,11 +738,6 @@ export function AutomationDetailModal({
                                     <>
                                         <Loader2 size={16} className="spinning" />
                                         <span>Running...</span>
-                                    </>
-                                ) : triggerSuccess ? (
-                                    <>
-                                        <Zap size={16} />
-                                        <span>Started!</span>
                                     </>
                                 ) : (
                                     <>
