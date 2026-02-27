@@ -21,6 +21,14 @@ const CATEGORY_ORDER: ToolCategory[] = ['web', 'read', 'write', 'execute', 'othe
 // 0 = collapsed, 1 = outline (titles only), 2 = full (titles + results)
 type ExpandLevel = 0 | 1 | 2;
 
+const EXPAND_LEVEL_KEY = 'thoughts-expand-level';
+
+function getStoredExpandLevel(): ExpandLevel {
+    const stored = localStorage.getItem(EXPAND_LEVEL_KEY);
+    if (stored === '1' || stored === '2') return Number(stored) as ExpandLevel;
+    return 0;
+}
+
 const CHEVRON_ICONS: Record<ExpandLevel, React.ComponentType<{ size?: number; className?: string }>> = {
     0: ChevronRight,
     1: ChevronDown,
@@ -64,7 +72,7 @@ function splitMultiHeadingThoughts(thoughts: Thought[]): Thought[] {
 }
 
 export function ThoughtsSection({ thoughts, isStreaming }: ThoughtsSectionProps) {
-    const [expandLevel, setExpandLevel] = useState<ExpandLevel>(0);
+    const [expandLevel, setExpandLevel] = useState<ExpandLevel>(getStoredExpandLevel);
 
     if (thoughts.length === 0) return null;
 
@@ -93,7 +101,11 @@ export function ThoughtsSection({ thoughts, isStreaming }: ThoughtsSectionProps)
     };
 
     // Cycle: 0 → 1 → 2 → 0
-    const cycleExpand = () => setExpandLevel(prev => ((prev + 1) % 3) as ExpandLevel);
+    const cycleExpand = () => setExpandLevel(prev => {
+        const next = ((prev + 1) % 3) as ExpandLevel;
+        localStorage.setItem(EXPAND_LEVEL_KEY, String(next));
+        return next;
+    });
 
     // Render grouped category icons with counts for the toggle button
     const renderSummary = () => {
