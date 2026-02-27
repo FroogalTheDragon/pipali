@@ -19,6 +19,7 @@ import { configureAuth, isAuthenticated, getPlatformUserInfo } from "./auth";
 import { createChildLogger } from './logger';
 import { initializeSandbox, shutdownSandbox } from './sandbox';
 import { initPlatformTransport, shutdownPlatformTransport } from './telemetry/platform-transport';
+import { setServer } from './server-instance';
 
 const log = createChildLogger({ component: 'server' });
 
@@ -305,6 +306,8 @@ async function main() {
     port: config.port,
     development: isDevelopmentMode,
   });
+
+  setServer(server);
 
   log.info(`Server listening on http://${config.host}:${server.port}`);
 

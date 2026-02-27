@@ -318,14 +318,14 @@ automations.post('/:id/trigger', async (c) => {
         external: { source: 'api', metadata: {} },
     };
 
-    const executionId = await queueExecution(id, triggerData);
+    const result = await queueExecution(id, triggerData);
 
-    if (!executionId) {
+    if (!result) {
         return c.json({ error: 'Failed to queue execution (rate limit or inactive)' }, 429);
     }
 
-    log.info(`Manually triggered automation: ${id}, execution: ${executionId}`);
-    return c.json({ success: true, executionId });
+    log.info(`Manually triggered automation: ${id}, execution: ${result.executionId}`);
+    return c.json({ success: true, ...result });
 });
 
 // ============== EXECUTIONS ==============

@@ -11,7 +11,9 @@ const log = createChildLogger({ component: 'llm' });
 
 // Test mock interface - set by E2E test preload scripts via globalThis
 declare global {
-    var __pipaliMockLLM: ((query: string) => ResponseWithThought) | undefined;
+    var __pipaliMockLLM:
+        | ((query: string, ctx?: { sessionId?: string }) => ResponseWithThought)
+        | undefined;
 }
 
 export async function sendMessageToModel(
@@ -31,7 +33,7 @@ export async function sendMessageToModel(
     if (globalThis.__pipaliMockLLM) {
         const actualQuery = query || history?.steps?.findLast(s => s.source === 'user')?.message || '';
         log.debug({ query: actualQuery.substring(0, 50) }, 'Using mock LLM');
-        return globalThis.__pipaliMockLLM(actualQuery);
+        return globalThis.__pipaliMockLLM(actualQuery, { sessionId: history?.session_id });
     }
 
     // Resolve model: use conversation's chatModelId if provided, otherwise user's default

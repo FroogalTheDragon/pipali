@@ -7,6 +7,7 @@
 import { test, expect } from '@playwright/test';
 import { ChatPage, HomePage } from '../helpers/page-objects';
 import { Selectors } from '../helpers/selectors';
+import { stopAllActiveRunsFromHome } from '../helpers/cleanup';
 
 test.describe('Confirmation Dialogs', () => {
     let chatPage: ChatPage;
@@ -17,6 +18,32 @@ test.describe('Confirmation Dialogs', () => {
         // Ensure we start with a fresh chat to avoid stale conversations from previous tests
         await chatPage.startNewChat();
         await chatPage.waitForConnection();
+    });
+
+    test.afterEach(async () => {
+        // Cleanup: never leave a run blocked on confirmation or still executing.
+        try {
+            if (await chatPage.confirmationDialog.isVisible()) {
+                await chatPage.clickConfirmationButton('no');
+                await chatPage.confirmationDialog.waitFor({ state: 'hidden', timeout: 15000 });
+            }
+        } catch {
+            // ignore
+        }
+
+        try {
+            if (await chatPage.isProcessing()) {
+                await chatPage.stopTask();
+            }
+        } catch {
+            // ignore
+        }
+
+        try {
+            await chatPage.waitForIdle();
+        } catch {
+            // ignore
+        }
     });
 
     test('should show confirmation dialog for read-only shell command', async ({ page }) => {
@@ -34,11 +61,17 @@ test.describe('Confirmation Dialogs', () => {
         await expect(chatPage.confirmationBtnDanger).toBeVisible();
 
         // Operation type pill should show read-only
-        const operationPill = page.locator(Selectors.operationTypePill);
+        const operationPill = chatPage.confirmationDialog.locator(Selectors.operationTypePill);
         if (await operationPill.isVisible()) {
             const pillText = await operationPill.textContent();
             expect(pillText?.toLowerCase()).toContain('read');
         }
+
+        // Cleanup: close the dialog so this test doesn't leave an active run blocked on confirmation.
+        await chatPage.clickConfirmationButton('no');
+        await chatPage.confirmationDialog.waitFor({ state: 'hidden', timeout: 5000 });
+        await chatPage.waitForAssistantResponse();
+        await chatPage.waitForIdle();
     });
 
     test('should accept confirmation and continue task', async () => {
@@ -65,22 +98,30 @@ test.describe('Confirmation Dialogs', () => {
         await homePage.goto();
 
         // Start a background task that triggers shell command
-        await homePage.sendBackgroundMessage('execute a bash command');
+        const query = `execute a bash command [e2e-${Date.now()}]`;
+        await homePage.sendBackgroundMessage(query);
 
         // Wait for task to start
-        await homePage.waitForTaskCount(1);
+        await homePage.waitForTaskWithTitle(query);
 
         // Wait for confirmation toast to appear (background tasks show toast instead of dialog)
-        const confirmationToast = page.locator(Selectors.confirmationToast);
+        const confirmationToast = page.locator(Selectors.confirmationToast, { hasText: query });
 
         // Toast might appear - check after a delay
-        await page.waitForTimeout(2000);
+        await expect(confirmationToast.first()).toBeVisible({ timeout: 15000 });
 
         // If toast is visible, verify it has action buttons
-        if (await confirmationToast.isVisible()) {
-            const toastButtons = page.locator(Selectors.toastBtn);
-            expect(await toastButtons.count()).toBeGreaterThan(0);
-        }
+        const toastButtons = confirmationToast.first().locator(Selectors.toastBtn);
+        expect(await toastButtons.count()).toBeGreaterThan(0);
+
+        // Cleanup: decline so we don't leave a needs_input run around for later tests.
+        const noBtn = confirmationToast.first().locator('.toast-actions .toast-btn.danger');
+        await expect(noBtn).toBeVisible({ timeout: 15000 });
+        await noBtn.evaluate((el: HTMLElement) => el.click());
+        await expect(confirmationToast).toHaveCount(0, { timeout: 15000 });
+
+        // Ensure the background run is not left active across tests.
+        await stopAllActiveRunsFromHome(page);
     });
 
     test('should skip future confirmations after Yes dont ask again', async ({ page }) => {
@@ -108,14 +149,14 @@ test.describe('Confirmation Dialogs', () => {
         // Wait a moment for dialog to potentially appear
         await page.waitForTimeout(1000);
 
-        // Dialog should not be visible
-        const dialogVisible = await chatPage.confirmationDialog.isVisible();
-        // Note: This test might be flaky depending on how preferences are persisted
-        // If the server clears preferences between tests, the dialog will appear again
-        // We check that either the dialog didn't appear OR the task is already processing/complete
-        const isProcessingOrComplete =
-            (await chatPage.isProcessing()) || (await chatPage.assistantMessages.count()) > 0;
-        expect(dialogVisible === false || isProcessingOrComplete).toBe(true);
+        // If dialog appears, respond so we don't leak a needs_input run.
+        if (await chatPage.confirmationDialog.isVisible()) {
+            await chatPage.clickConfirmationButton('no');
+            await chatPage.confirmationDialog.waitFor({ state: 'hidden', timeout: 15000 });
+        }
+
+        await chatPage.waitForAssistantResponse();
+        await chatPage.waitForIdle();
     });
 
     test('should show different dialog for read-write shell command', async ({ page }) => {
@@ -130,12 +171,18 @@ test.describe('Confirmation Dialogs', () => {
 
         // For read-write commands, there should be warning styling
         // The operation type pill should indicate write
-        const operationPill = page.locator(Selectors.operationTypePill);
+        const operationPill = chatPage.confirmationDialog.locator(Selectors.operationTypePill);
         if (await operationPill.isVisible()) {
             const pillText = await operationPill.textContent();
             // Should contain read-write or write
             expect(pillText?.toLowerCase()).toMatch(/write|read-write/);
         }
+
+        // Cleanup: close the dialog so this test doesn't leave an active run blocked on confirmation.
+        await chatPage.clickConfirmationButton('no');
+        await chatPage.confirmationDialog.waitFor({ state: 'hidden', timeout: 15000 });
+        await chatPage.waitForAssistantResponse();
+        await chatPage.waitForIdle();
     });
 
     test('should fail tool call but continue conversation on No', async () => {

@@ -22,6 +22,7 @@ import { loadSkills, getLoadedSkills, createSkill, getSkill, deleteSkill, update
 import { loadUserContext, saveUserContext } from '../user-context';
 import { syncPlatformModels, syncPlatformWebTools } from '../auth';
 import { createChildLogger } from '../logger';
+import { getBus } from '../events/conversation-event-bus';
 import {
     getSandboxConfig,
     getDefaultPaths,
@@ -335,6 +336,11 @@ api.delete('/conversations/:conversationId/messages/:stepId', async (c) => {
             if (deletedCount === 0) {
                 return c.json({ error: 'Message not found' }, 404);
             }
+            getBus(conversationId)?.publish({
+                type: 'message_deleted',
+                conversationId,
+                data: { stepId, role: 'assistant' },
+            });
             return c.json({ success: true, deletedCount });
         } else {
             // Delete user message and the following assistant message (if any)
@@ -342,6 +348,11 @@ api.delete('/conversations/:conversationId/messages/:stepId', async (c) => {
             if (deletedCount === 0) {
                 return c.json({ error: 'Message not found' }, 404);
             }
+            getBus(conversationId)?.publish({
+                type: 'message_deleted',
+                conversationId,
+                data: { stepId, role: 'user' },
+            });
             return c.json({ success: true, deletedCount });
         }
     } catch (error) {

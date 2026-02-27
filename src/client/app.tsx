@@ -24,7 +24,7 @@ import { useFocusManagement, useFileDrop, useModels, useSidecar, useWebSocketCha
 
 // Utils
 import { setApiBaseUrl, apiFetch } from "./utils/api";
-import { generateUUID, getToolCategory, type ToolCategory } from "./utils/formatting";
+import { generateUUID, generateDeterministicId, getToolCategory, type ToolCategory } from "./utils/formatting";
 import { initNotifications, notifyConfirmationRequest, notifyTaskComplete, setNotificationClickHandler, setupFocusNavigationListener } from "./utils/notifications";
 import { isTauri, onWindowShown, onSidecarReady, listenForDeepLinks } from "./utils/tauri";
 
@@ -72,7 +72,7 @@ const App = () => {
             .then(data => {
                 if (data?.name) setUserName(data.name.split(' ')[0]);
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     // Core state
@@ -133,6 +133,9 @@ const App = () => {
     const messagesRef = useRef<Message[]>([]);
     // Track isConnected for callbacks that may close over stale state
     const isConnectedRef = useRef(false);
+    // When on home page, observe active conversations so confirmations and live state
+    // (e.g., needs_input) can appear without opening the conversation.
+    const observedActiveConversationsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         automationConfirmationsRef.current = automationConfirmations;
@@ -163,14 +166,17 @@ const App = () => {
         stop,
         respondToConfirmation,
         fork,
+        observe,
         setConversationId: setChatConversationId,
         setMessages: setChatMessages,
         clearConversation,
         syncConversationState,
         removeConversationState,
         clearCompleted,
+        clearStopped,
         clearConfirmations,
         dismissConfirmation,
+        mergeHistory,
     } = useWebSocketChat({
         wsUrl,
         shouldActivateConversationOnCreate: () => pendingBackgroundMessageRef.current === null,
@@ -276,6 +282,12 @@ const App = () => {
 
     useEffect(() => {
         isConnectedRef.current = isConnected;
+    }, [isConnected]);
+
+    useEffect(() => {
+        if (!isConnected) {
+            observedActiveConversationsRef.current.clear();
+        }
     }, [isConnected]);
 
     // Initialize data fetching - wait for sidecar to be ready in desktop mode
@@ -448,9 +460,11 @@ const App = () => {
             window.history.pushState({}, '', url);
         }
 
-        // Skip fetching if this is just a new conversation getting its ID assigned
+        // Skip fetching if this is just a new conversation getting its server-assigned ID
         // and we already have optimistic messages in memory.
-        const isNewConversationGettingId = prevId === undefined && conversationId !== undefined;
+        // Only applies when we're actively awaiting a conversation_created response
+        // (not when loading a conversation from URL on page load).
+        const isNewConversationGettingId = prevId === undefined && conversationId !== undefined && awaitingConversationIdRef.current;
         if (isNewConversationGettingId && messages.length > 0) {
             syncConversationState(conversationId, messages);
             prevConversationIdRef.current = conversationId;
@@ -461,6 +475,9 @@ const App = () => {
             const convState = conversationStates.get(conversationId);
             if (convState?.messages && convState.messages.length > 0) {
                 setChatMessages(convState.messages);
+                // Refresh history in the background to avoid stale cached state
+                // (especially important for automations and mid-run history opens).
+                void fetchHistory(conversationId);
             } else {
                 fetchHistory(conversationId);
             }
@@ -468,6 +485,40 @@ const App = () => {
 
         prevConversationIdRef.current = conversationId;
     }, [conversationId]);
+
+    // Observe whenever the viewed conversation or connection state changes.
+    // This is required for: multi-tab observers and automation conversations
+    // (which may not appear in the main conversations list).
+    useEffect(() => {
+        if (!conversationId || !isConnected) return;
+        observe(conversationId);
+    }, [conversationId, isConnected, observe]);
+
+    useEffect(() => {
+        if (!isConnected) return;
+        if (currentPage !== 'home') return;
+
+        // Observe conversations that might need live updates on Home:
+        // - server-reported active runs (conversations[].isActive)
+        // - locally persisted in-flight runs (conversationStates.isProcessing)
+        //
+        // This is important for confirmation toasts on reload: pending confirmations
+        // aren't persisted, so Home must re-observe the conversation to receive
+        // the replayed confirmation_request event.
+        const idsToObserve = new Set<string>();
+        for (const conv of conversations) {
+            if (conv.isActive) idsToObserve.add(conv.id);
+        }
+        for (const [convId, state] of conversationStates.entries()) {
+            if (state.isProcessing) idsToObserve.add(convId);
+        }
+
+        for (const convId of idsToObserve) {
+            if (observedActiveConversationsRef.current.has(convId)) continue;
+            observedActiveConversationsRef.current.add(convId);
+            observe(convId);
+        }
+    }, [currentPage, conversations, conversationStates, isConnected, observe]);
 
     const stopResearch = useCallback(() => {
         if (!isConnected || !isProcessing || !conversationId) return;
@@ -689,10 +740,11 @@ const App = () => {
                     if (msg.extra?.is_compaction === true) {
                         // Add compaction summary as a thought for the next agent message
                         const summaryContent = typeof msg.message === 'string' ? msg.message : JSON.stringify(msg.message);
+                        const content = `**Compact Context.**\n${summaryContent}`;
                         thoughts.push({
                             type: 'thought',
-                            content: `**Compact Context**\n${summaryContent}`,
-                            id: generateUUID(),
+                            content: content,
+                            id: generateDeterministicId('compaction', content),
                             isInternalThought: true,
                         });
                         continue;
@@ -703,11 +755,12 @@ const App = () => {
                     const attachedFiles = attachMatch
                         ? attachMatch[1].split('\n').map((line: string) => line.replace(/^- /, '').split('/').pop() || '').filter(Boolean)
                         : undefined;
+                    const stepId = msg.step_id != null ? String(msg.step_id) : generateUUID();
                     historyMessages.push({
                         role: 'user',
                         content: rawContent.replace(/\n\n<attached_files>[\s\S]*?<\/attached_files>$/, ''),
-                        id: msg.step_id,
-                        stableId: msg.step_id,
+                        id: stepId,
+                        stableId: stepId,
                         attachedFiles,
                     });
                 }
@@ -715,7 +768,7 @@ const App = () => {
                 if (msg.source === 'agent') {
                     // Track first agent step_id for this message group (used for orphaned thoughts)
                     if (firstAgentStepId === null) {
-                        firstAgentStepId = msg.step_id;
+                        firstAgentStepId = msg.step_id != null ? String(msg.step_id) : generateUUID();
                     }
                     let toolResultsMap: Map<string, string> = new Map();
                     const hasMessage = msg.message && msg.message.trim() !== '';
@@ -724,7 +777,7 @@ const App = () => {
                         thoughts.push({
                             type: 'thought',
                             content: msg.reasoning_content,
-                            id: generateUUID(),
+                            id: generateDeterministicId('thought', msg.reasoning_content),
                             isInternalThought: true,
                         });
                     }
@@ -733,8 +786,8 @@ const App = () => {
                     if (msg.observation && msg.observation.results) {
                         toolResultsMap = new Map(
                             msg.observation.results
-                            .filter((res: any) => res.source_call_id && res.content)
-                            .map((res: any) => [res.source_call_id, typeof res.content === 'string' ? res.content : JSON.stringify(res.content)])
+                                .filter((res: any) => res.source_call_id && res.content)
+                                .map((res: any) => [res.source_call_id, typeof res.content === 'string' ? res.content : JSON.stringify(res.content)])
                         );
                     }
 
@@ -745,7 +798,7 @@ const App = () => {
                             thoughts.push({
                                 type: 'thought',
                                 content: msg.message,
-                                id: generateUUID(),
+                                id: generateDeterministicId('thought', msg.message),
                             });
                         }
                         for (const tc of msg.tool_calls) {
@@ -760,19 +813,19 @@ const App = () => {
                         }
                     } else if (hasMessage) {
                         // No tool calls, just a message - set as currentAgentMessage
+                        const stepId = msg.step_id != null ? String(msg.step_id) : generateUUID();
                         currentAgentMessage = {
                             role: 'assistant',
                             content: msg.message,
-                            id: msg.step_id,
-                            stableId: msg.step_id,
+                            id: stepId,
+                            stableId: stepId,
                         };
                     }
                 }
             }
 
             finalizeCurrentAgent();
-            setChatMessages(historyMessages);
-            syncConversationState(id, historyMessages);
+            mergeHistory(id, historyMessages);
             historyLoadedConversationIdRef.current = id;
 
             // Sync model dropdown to conversation's model and cache it
@@ -919,8 +972,8 @@ const App = () => {
                 // Determine status: pending confirmation takes precedence over processing
                 const status = hasPendingConfirmation ? 'needs_input' as const
                     : state.isProcessing ? 'running' as const
-                    : state.isCompleted ? 'completed' as const
-                    : 'stopped' as const;
+                        : state.isCompleted ? 'completed' as const
+                            : 'stopped' as const;
 
                 // For completed tasks, show the final response instead of intermediate reasoning
                 const reasoning = (status === 'completed' || status === 'stopped') && assistantMsg?.content
@@ -1006,25 +1059,22 @@ const App = () => {
         if (conversationId) {
             syncConversationState(conversationId, messages);
         }
-        // Clear completed flag so the task no longer shows on home page
+        // Clear completed/stopped flags so the task no longer shows on home page
         clearCompleted(id);
+        clearStopped(id);
         conversationIdRef.current = id;
         setChatConversationId(id);
         // Store highlight term to open FindInPage once messages render
         if (highlightTerm) {
             pendingHighlightRef.current = { term: highlightTerm, conversationId: id };
         }
-        const convState = conversationStates.get(id);
-        if (convState?.messages && convState.messages.length > 0) {
-            setChatMessages(convState.messages);
-            // Sync model dropdown from cached model ID
-            const cachedModelId = conversationModelIds.current.get(id);
-            if (cachedModelId) {
-                const conversationModel = models.find(m => m.id === cachedModelId);
-                if (conversationModel) setSelectedModel(conversationModel);
-            }
+
+        // Sync model dropdown from cached model ID immediately; history fetch will reconcile.
+        const cachedModelId = conversationModelIds.current.get(id);
+        if (cachedModelId) {
+            const conversationModel = models.find(m => m.id === cachedModelId);
+            if (conversationModel) setSelectedModel(conversationModel);
         }
-        else fetchHistory(id);
     };
 
     const startNewConversation = () => {
@@ -1276,7 +1326,7 @@ const App = () => {
         // If we have a conversationId, fork it (includes chat history)
         // Otherwise, create a new conversation from scratch
         if (conversationId) {
-            fork(fullMessage, conversationId);
+            fork(fullMessage, conversationId, { clientMessageId, runId });
         } else {
             // No conversationId - create new conversation from scratch
             sendWsMessage(fullMessage, undefined, { clientMessageId, runId, optimistic: false });

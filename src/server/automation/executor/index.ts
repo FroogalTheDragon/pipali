@@ -8,15 +8,15 @@
 import { db } from '../../db';
 import { Automation, AutomationExecution, Conversation, PendingConfirmation, User } from '../../db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
-import { runResearchToCompletion } from '../../processor/research-runner';
 import { atifConversationService } from '../../processor/conversation/atif/atif.service';
 import type { TriggerEventData } from '../types';
 import type { ConfirmationContext } from '../../processor/confirmation';
 import { createEmptyPreferences } from '../../processor/confirmation';
 import type { ConfirmationRequest, ConfirmationResponse } from '../../processor/confirmation/confirmation.types';
 import { createStandardConfirmationOptions } from '../../processor/confirmation/confirmation.types';
+import { getOrCreateBus } from '../../events/conversation-event-bus';
+import { executeRun } from '../../events/run-executor';
 import { createChildLogger } from '../../logger';
-import { maxIterations } from '../../utils';
 
 const log = createChildLogger({ component: 'automation' });
 
@@ -92,12 +92,14 @@ async function checkRateLimits(automation: typeof Automation.$inferSelect): Prom
 }
 
 /**
- * Queue an automation for execution
+ * Queue an automation for execution.
+ * Returns executionId and conversationId, or null if the automation
+ * cannot run (not found, inactive, rate-limited).
  */
 export async function queueExecution(
     automationId: string,
     triggerData: TriggerEventData
-): Promise<string | null> {
+): Promise<{ executionId: string; conversationId: string } | null> {
     log.info(`Queuing execution for ${automationId}`);
 
     // Get automation to check rate limits
@@ -120,6 +122,16 @@ export async function queueExecution(
     if (!withinLimits) {
         return null;
     }
+
+    // Ensure conversation exists before queuing so callers always get a conversationId
+    const [user] = await db.select()
+        .from(User)
+        .where(eq(User.id, automation.userId));
+    if (!user) {
+        log.error(`User not found for: ${automationId}`);
+        return null;
+    }
+    const conversationId = await getOrCreateAutomationConversation(automation, user);
 
     // Create execution record
     const insertResult = await db.insert(AutomationExecution)
@@ -145,7 +157,7 @@ export async function queueExecution(
     // Process queue (non-blocking)
     processQueue();
 
-    return execution.id;
+    return { executionId: execution.id, conversationId };
 }
 
 /**
@@ -173,14 +185,16 @@ async function runExecutionWithRetry(
     triggerData: TriggerEventData
 ): Promise<void> {
     let lastError: Error | null = null;
+    let includeUserMessage = true;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            await runExecution(executionId, automationId, triggerData);
+            await runExecution(executionId, automationId, triggerData, { includeUserMessage });
             return; // Success - exit retry loop
         } catch (error) {
             lastError = error as Error;
             const errorMessage = lastError.message;
+            includeUserMessage = false;
 
             // Don't retry for certain error types
             if (
@@ -348,7 +362,8 @@ async function getOrCreateAutomationConversation(
 async function runExecution(
     executionId: string,
     automationId: string,
-    triggerData: TriggerEventData
+    triggerData: TriggerEventData,
+    options?: { includeUserMessage?: boolean }
 ): Promise<void> {
     // Check if already running
     if (runningExecutions.has(automationId)) {
@@ -395,23 +410,24 @@ async function runExecution(
         // Build the prompt with trigger context
         const contextualPrompt = buildPromptWithContext(automation.prompt, triggerData);
 
-        // Add the automation prompt as user message to the conversation
-        await atifConversationService.addStep(
-            conversationId,
-            'user',
-            contextualPrompt
-        );
+        // Always create bus so WS observers can subscribe mid-run
+        const bus = getOrCreateBus(conversationId);
 
-        // Create confirmation context for this execution
+        // Use DB-based confirmations for automations (24h timeout, persisted across restarts)
         const confirmationContext = createAutomationConfirmationContext(executionId, automationId);
 
-        // Run research using the shared runner
-        const result = await runResearchToCompletion({
+        const runId = crypto.randomUUID();
+        await executeRun({
+            bus,
             conversationId,
             user,
-            maxIterations: maxIterations,
-            abortSignal: abortController.signal,
-            confirmationContext,
+            // When we retry an execution, avoid persisting duplicate user messages.
+            // The initial attempt already wrote the user prompt into the conversation.
+            userMessage: options?.includeUserMessage === false ? undefined : contextualPrompt,
+            runId,
+            clientMessageId: executionId,
+            confirmationPreferences: createEmptyPreferences(),
+            confirmationContextOverride: confirmationContext,
         });
 
         // Update execution as completed
@@ -427,7 +443,7 @@ async function runExecution(
             .set({ lastExecutedAt: new Date() })
             .where(eq(Automation.id, automationId));
 
-        log.info(`Execution ${executionId} completed (${result.iterationCount} iterations)`);
+        log.info(`Execution ${executionId} completed`);
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);

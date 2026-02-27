@@ -409,6 +409,108 @@ export function multiToolScenario(): MockScenario {
 }
 
 /**
+ * Repro scenario for pub-sub reload dedupe issues
+ * - Starts with a confirmation-gated tool call (shell_command)
+ * - Continues with multiple tool steps so a reload mid-run can cause duplicates if replay isn't deduped
+ */
+export function pubSubReloadReproScenario(): MockScenario {
+    return {
+        name: 'pubsub-reload-repro',
+        // Keep this pattern extremely specific so it never matches other tests
+        queryPattern: '^repro pubsub reload(\\s+.+)?$',
+        iterations: [
+            {
+                thought: 'Step 1: Request permission to run a read-only command.',
+                toolCalls: [
+                    {
+                        function_name: 'shell_command',
+                        arguments: {
+                            justification: 'E2E repro: repro-shell-1',
+                            command: "printf 'repro-shell-1'",
+                            cwd: '.',
+                            operation_type: 'read-only',
+                        },
+                        tool_call_id: 'tc-repro-shell-1',
+                    },
+                ],
+                toolResults: [
+                    {
+                        source_call_id: 'tc-repro-shell-1',
+                        content: 'repro-shell-1',
+                    },
+                ],
+            },
+            {
+                thought: 'Step 2: Search for a unique marker in src.',
+                toolCalls: [
+                    {
+                        function_name: 'grep_files',
+                        arguments: { pattern: 'repro-pattern-2', path: 'src' },
+                        tool_call_id: 'tc-repro-grep-2',
+                    },
+                ],
+                toolResults: [
+                    {
+                        source_call_id: 'tc-repro-grep-2',
+                        content: 'Found 0 matches for repro-pattern-2',
+                    },
+                ],
+            },
+            {
+                thought: 'Step 3: Search for another unique marker in src.',
+                toolCalls: [
+                    {
+                        function_name: 'grep_files',
+                        arguments: { pattern: 'repro-pattern-3', path: 'src' },
+                        tool_call_id: 'tc-repro-grep-3',
+                    },
+                ],
+                toolResults: [
+                    {
+                        source_call_id: 'tc-repro-grep-3',
+                        content: 'Found 0 matches for repro-pattern-3',
+                    },
+                ],
+            },
+            {
+                thought: 'Step 4: List files with a unique pattern marker.',
+                toolCalls: [
+                    {
+                        function_name: 'list_files',
+                        arguments: { path: '.', pattern: 'repro-list-4' },
+                        tool_call_id: 'tc-repro-list-4',
+                    },
+                ],
+                toolResults: [
+                    {
+                        source_call_id: 'tc-repro-list-4',
+                        content: 'Repro list completed',
+                    },
+                ],
+            },
+            {
+                thought: 'Step 5: Final unique search marker in src.',
+                toolCalls: [
+                    {
+                        function_name: 'grep_files',
+                        arguments: { pattern: 'repro-pattern-5', path: 'src' },
+                        tool_call_id: 'tc-repro-grep-5',
+                    },
+                ],
+                toolResults: [
+                    {
+                        source_call_id: 'tc-repro-grep-5',
+                        content: 'Found 0 matches for repro-pattern-5',
+                    },
+                ],
+            },
+        ],
+        finalResponse: 'Repro run complete.',
+        iterationDelayMs: 1000,
+    };
+}
+
+/**
  * Default scenarios used in tests
  */
 export const defaultMockScenarios: MockScenario[] = [
@@ -425,6 +527,7 @@ export const defaultMockScenarios: MockScenario[] = [
     writeFileScenario(),
     readFileScenario(),
     multiToolScenario(),
+    pubSubReloadReproScenario(),
 ];
 
 /**
