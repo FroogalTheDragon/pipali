@@ -73,17 +73,25 @@ export function ThoughtItem({ thought, stepNumber, isPreview = false, showResult
 
     if (thought.type === 'thought' && thought.content) {
         const text = thought.content.trim();
-        const firstLine = showResult ? text : (text.split('\n')[0] ?? text);
-        const canToggle = onToggle && (isOverflowing || showResult);
+        const isInternal = !!thought.isInternalThought;
+        // Truncate internal reasoning in outline mode; show non-internal text in full
+        const isOutline = !showResult && isInternal;
+        const displayText = isOutline ? (text.split('\n')[0] ?? text) : text;
+        const isTruncated = isOutline && (text.includes('\n') || isOverflowing);
+        const canToggle = onToggle && isInternal && (isTruncated || showResult);
         return (
             <div
-                className={`thought-item reasoning ${thought.isInternalThought ? 'internal' : ''} ${isPreview ? 'preview' : ''}${canToggle ? ' clickable' : ''}`}
+                className={`thought-item reasoning ${isInternal ? 'internal' : ''} ${isPreview ? 'preview' : ''}${canToggle ? ' clickable' : ''}`}
                 onClick={canToggle ? onToggle : undefined}
             >
                 <div className="thought-step"><span className="thought-reasoning-dot" /></div>
                 <div className="thought-content">
-                    <div ref={reasoningRef} className={`thought-reasoning ${thought.isInternalThought ? 'italic' : ''} ${!showResult ? 'outline' : ''}`} title={!showResult && isOverflowing ? text : undefined}>
-                        {formatBoldText(firstLine)}
+                    <div
+                        ref={isInternal ? reasoningRef : undefined}
+                        className={`thought-reasoning ${isInternal ? 'italic' : ''} ${isOutline ? 'outline' : ''}`}
+                        title={isTruncated ? text : undefined}
+                    >
+                        {formatBoldText(displayText)}
                     </div>
                 </div>
             </div>
