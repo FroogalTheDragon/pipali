@@ -22,7 +22,7 @@ Open [http://localhost:6464](http://localhost:6464) in your browser.
 
 #### Don't forget to set TAURI_SIGNING_PRIVATE_KEY
 
-Pipali uses [Tauri](https://v2.tauri.app/) for it's desktop. Tauri uses [signed updates](https://v2.tauri.app/plugin/updater/#signing-updates) with the [Tauri Updater](https://v2.tauri.app/plugin/updater/#_top).  The Tauri Updater uses an environment variable that must be set **BEFORE** you build Pipali using `bun run tauri:build`.
+Pipali uses [Tauri](https://v2.tauri.app/) for it's desktop. Tauri uses [signed updates](https://v2.tauri.app/plugin/updater/#signing-updates) with the [Tauri Updater](https://v2.tauri.app/plugin/updater/#_top).  The Tauri Updater uses an environment variable that must be set **BEFORE** you build Pipali!
 
 #### Setting TAURI_SIGNING_PRIVATE_KEY
 
