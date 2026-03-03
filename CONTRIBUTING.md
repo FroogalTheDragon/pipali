@@ -20,6 +20,26 @@ Open [http://localhost:6464](http://localhost:6464) in your browser.
 
 ### Desktop App
 
+#### Don't forget to set TAURI_SIGNING_PRIVATE_KEY
+
+Pipali uses [Tauri](https://v2.tauri.app/) for it's desktop. Tauri uses [signed updates](https://v2.tauri.app/plugin/updater/#signing-updates) with the [Tauri Updater](https://v2.tauri.app/plugin/updater/#_top).  The Tauri Updater uses an environment variable that must be set **BEFORE** you build Pipali using `bun run tauri:build`.
+
+#### Setting TAURI_SIGNING_PRIVATE_KEY
+
+##### .env (recommended)
+
+Setting the variable in a `.env` file is the recommended way to do it so you don't have to keep setting it each development session.
+
+Copy `.env.example` into a file named `.env` if you haven't already and set `TAURI_SIGNING_PRIVATE_KEY` to the key you [generated](https://v2.tauri.app/reference/cli/#signer-generate) using Tauri CLI.
+
+##### Using export
+
+Using `export` you can run:
+```shell
+export TAURI_SIGNING_PRIVATE_KEY=you_key_here
+```
+
+
 Build the Tauri desktop app (requires [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)):
 
 ```bash
