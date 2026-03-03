@@ -187,6 +187,7 @@ api.get('/conversations', async (c) => {
         createdAt: Conversation.createdAt,
         updatedAt: Conversation.updatedAt,
         trajectory: Conversation.trajectory,
+        automationId: Conversation.automationId,
     })
     .from(Conversation)
     .where(whereClause)
@@ -253,6 +254,7 @@ api.get('/conversations', async (c) => {
             createdAt: conv.createdAt,
             updatedAt: conv.updatedAt,
             isActive,
+            isAutomation: !!conv.automationId,
             latestReasoning,
             ...(matchSnippet !== undefined && { matchSnippet }),
         };

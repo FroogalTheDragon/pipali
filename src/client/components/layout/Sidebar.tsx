@@ -394,6 +394,8 @@ export function Sidebar({
                     <AlertCircle size={16} className="conversation-icon needs-attention" />
                 ) : isCompleted ? (
                     <CheckCircle size={16} className="conversation-icon completed" />
+                ) : conv.isAutomation ? (
+                    <Clock size={16} className="conversation-icon" />
                 ) : (
                     <MessageSquare size={16} className="conversation-icon" />
                 )}
