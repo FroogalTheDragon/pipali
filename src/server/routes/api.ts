@@ -161,11 +161,8 @@ api.get('/conversations', async (c) => {
 
     const q = c.req.query('q')?.trim();
 
-    // Base filter: user's non-automation conversations
-    const baseWhere = and(
-        eq(Conversation.userId, adminUser.id),
-        isNull(Conversation.automationId)
-    );
+    // Base filter: user's conversations (including automation conversations)
+    const baseWhere = eq(Conversation.userId, adminUser.id);
 
     // When searching, add JSONB full-text search across user messages and agent final responses
     const searchPattern = q ? `%${q.replace(/%/g, '\\%').replace(/_/g, '\\_')}%` : '';
