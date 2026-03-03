@@ -38,6 +38,7 @@ Using `export` you can run:
 ```shell
 export TAURI_SIGNING_PRIVATE_KEY=you_key_here
 ```
+The downside to this is you will have to set it each time you re-open your terminal.
 
 
 Build the Tauri desktop app (requires [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)):
