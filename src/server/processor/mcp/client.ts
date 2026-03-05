@@ -365,10 +365,17 @@ export class McpClient {
                 error: errorMessage,
             };
         } catch (error) {
+            let errorMsg = error instanceof Error ? error.message : String(error);
+            // Preserve the cause chain (e.g., puppeteer wraps the real error in a generic message)
+            if (error instanceof Error && error.cause) {
+                const cause = error.cause instanceof Error ? error.cause.message : String(error.cause);
+                errorMsg += `\nCause: ${cause}`;
+            }
+            log.error({ err: error, tool: toolName, server: this.config.name }, 'MCP tool execution failed');
             return {
                 success: false,
                 content: [],
-                error: error instanceof Error ? error.message : String(error),
+                error: errorMsg,
             };
         }
     }

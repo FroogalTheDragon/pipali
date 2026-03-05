@@ -2,7 +2,7 @@ import path from 'path';
 import { homedir } from 'os';
 import fs from 'fs/promises';
 import { minimatch } from 'minimatch';
-import { clampInt, extractLiteralFromRegex, getExcludedDirNamesForRootDir, isBroadSearch, resolveCaseInsensitivePath, resolvePath, walkFilePaths, runMdfind } from './actor.utils';
+import { clampInt, extractLiteralFromRegex, getExcludedDirNamesForRootDir, isBroadSearch, resolveCaseInsensitivePath, resolvePath, walkFilePaths, runMdfind, TCC_PROTECTED_EXTENSIONS } from './actor.utils';
 import { isSensitivePath, getSensitivePathReason } from '../../security';
 import {
     type ConfirmationContext,
@@ -99,6 +99,11 @@ function isBinaryFile(filePath: string): boolean {
  */
 function buildBinaryExcludeGlobs(): string[] {
     return Array.from(BINARY_EXTENSIONS).map(ext => `!*${ext}`);
+}
+
+function buildTccBundleExcludeGlobs(): string[] {
+    if (process.platform !== 'darwin') return [];
+    return Array.from(TCC_PROTECTED_EXTENSIONS).map(ext => `!**/*${ext}/**`);
 }
 
 
@@ -490,9 +495,10 @@ async function grepWithRipgrep(params: {
     const baseArgs = [...args, '--pcre2', params.pattern, path.resolve(params.searchPath)];
     const retryArgs = [...args, params.pattern, path.resolve(params.searchPath)];
 
-    // Apply globs (directory excludes and binary file excludes)
+    // Apply globs (directory excludes, TCC bundle excludes, and binary file excludes)
     const globExcludes = [
         ...buildRipgrepGlobExcludes(excluded),
+        ...buildTccBundleExcludeGlobs(),
         ...buildBinaryExcludeGlobs(),
     ];
     for (const glob of globExcludes) {

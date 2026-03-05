@@ -45,12 +45,16 @@ export async function loadEnabledMcpServers(): Promise<void> {
                 .where(eq(McpServer.id, server.id));
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            log.error({ err: errorMessage, server: server.name }, 'Failed to connect to MCP server');
+            const causeMessage = error instanceof Error && error.cause
+                ? (error.cause instanceof Error ? error.cause.message : String(error.cause))
+                : undefined;
+            const fullError = causeMessage ? `${errorMessage}\nCause: ${causeMessage}` : errorMessage;
+            log.error({ err: error, server: server.name }, 'Failed to connect to MCP server');
 
             // Store the error in the database
             await db
                 .update(McpServer)
-                .set({ lastError: errorMessage })
+                .set({ lastError: fullError })
                 .where(eq(McpServer.id, server.id));
         }
     });

@@ -105,12 +105,27 @@ function getHomeMacExcludedDirNames(): Set<string> {
     ]);
 }
 
+/** Opaque app bundles that trigger their own TCC category (e.g., Photos, Media Library access). */
+const TCC_PROTECTED_EXTENSIONS = new Set([
+    '.photoslibrary',
+    '.photolibrary',
+    '.musiclibrary',
+    '.tvlibrary',
+    '.imovielibrary',
+]);
+
 function shouldExcludeEntry(
     entryName: string,
     opts: { includeHidden: boolean; excludedDirNames: Set<string> }
 ): boolean {
     if (!opts.includeHidden && entryName.startsWith('.')) return true;
-    return opts.excludedDirNames.has(entryName);
+    if (opts.excludedDirNames.has(entryName)) return true;
+    // Skip opaque app bundles that trigger their own TCC prompts (e.g., Photos Library)
+    if (process.platform === 'darwin') {
+        const ext = path.extname(entryName).toLowerCase();
+        if (TCC_PROTECTED_EXTENSIONS.has(ext)) return true;
+    }
+    return false;
 }
 
 function getExcludedDirNamesForRootDir(rootDir: string, opts: { includeAppFolders: boolean }): Set<string> {
@@ -339,6 +354,10 @@ function shouldExcludeMdfindResult(
     for (const seg of segments) {
         if (!includeHidden && seg.startsWith('.')) return true;
         if (excludedDirs.has(seg)) return true;
+        if (process.platform === 'darwin') {
+            const ext = path.extname(seg).toLowerCase();
+            if (TCC_PROTECTED_EXTENSIONS.has(ext)) return true;
+        }
     }
     return false;
 }
@@ -431,4 +450,5 @@ export {
     shouldExcludeMdfindResult,
     extractLiteralFromRegex,
     runMdfind,
+    TCC_PROTECTED_EXTENSIONS,
 };
