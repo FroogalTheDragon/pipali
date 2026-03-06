@@ -48,6 +48,7 @@ interface SidebarProps {
     exportingConversationId: string | null;
     currentPage?: 'home' | 'chat' | 'skills' | 'automations' | 'mcp-tools' | 'settings';
     authStatus?: AuthStatus | null;
+    userName?: string;
     billingAlerts?: BillingAlert[];
     platformFrontendUrl?: string;
     onNewChat: () => void;
@@ -74,6 +75,7 @@ export function Sidebar({
     exportingConversationId,
     currentPage,
     authStatus,
+    userName,
     billingAlerts,
     platformFrontendUrl,
     onNewChat,
@@ -121,7 +123,8 @@ export function Sidebar({
     }, [userEmail, hasProfilePicture]);
 
     // Get user initial for avatar fallback
-    const userInitial = getUserInitial(authStatus?.user?.name, authStatus?.user?.email);
+    const displayName = userName || authStatus?.user?.name;
+    const userInitial = getUserInitial(displayName, authStatus?.user?.email);
 
     // Close menus when clicking outside
     useEffect(() => {
@@ -634,9 +637,9 @@ export function Sidebar({
                                     <span className="user-name">
                                         {authStatus.anonMode
                                             ? 'Anonymous Mode'
-                                            : authStatus.user?.name || authStatus.user?.email || 'User'}
+                                            : displayName || authStatus.user?.email || 'User'}
                                     </span>
-                                    {!authStatus.anonMode && authStatus.user?.email && authStatus.user?.name && (
+                                    {!authStatus.anonMode && authStatus.user?.email && displayName && (
                                         <span className="user-email">{authStatus.user.email}</span>
                                     )}
                                 </div>

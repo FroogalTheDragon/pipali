@@ -163,25 +163,30 @@ async function fetchLocationFromIP(): Promise<string | undefined> {
 }
 
 /**
- * Initialize user context on first run or update missing fields
- * Creates USER.md with auto-populated name (from login) and location (from IP)
- * If file exists but name is missing, updates the name field
+ * Initialize user context on first run or update name if user hasn't customized it.
+ * Creates USER.md with auto-populated name (from login) and location (from IP).
  *
- * @param userInfo - Optional user info from login (name from platform)
+ * On subsequent logins, updates the name only if it still matches the previous
+ * platform name (i.e. user never manually changed it).
+ *
+ * @param userInfo - User info from login
+ * @param userInfo.name - Current display name from platform
+ * @param userInfo.previousPlatformName - Last known platform name stored in DB
  */
-export async function initializeUserContext(userInfo?: { name?: string }): Promise<void> {
+export async function initializeUserContext(userInfo?: { name?: string; previousPlatformName?: string | null }): Promise<void> {
     const userContextPath = getUserContextPath();
     const file = Bun.file(userContextPath);
 
     try {
         // Check if file exists
         if (await file.exists()) {
-            // File exists - check if we need to update the name
             if (userInfo?.name) {
                 const existingCtx = await loadUserContext();
-                if (!existingCtx.name) {
-                    // Name is missing, update it
-                    log.info({ name: userInfo.name }, 'Updating user context with name');
+                // Update name if: missing, or still matches the old platform name (never customized)
+                const shouldUpdate = !existingCtx.name
+                    || (userInfo.previousPlatformName && existingCtx.name === userInfo.previousPlatformName && existingCtx.name !== userInfo.name);
+                if (shouldUpdate) {
+                    log.info({ oldName: existingCtx.name, newName: userInfo.name }, 'Updating user context with platform name');
                     await saveUserContext({
                         ...existingCtx,
                         name: userInfo.name,

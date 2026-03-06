@@ -46,7 +46,11 @@ function mergeWithDefaults(userPaths: string[], defaultPaths: string[]): string[
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-export function SettingsPage() {
+interface SettingsPageProps {
+    onUserContextSaved?: () => void;
+}
+
+export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [name, setName] = useState('');
     const [location, setLocation] = useState('');
@@ -134,6 +138,7 @@ export function SettingsPage() {
             if (res.ok) {
                 setSaveStatus('saved');
                 setOriginalValues({ name, location, instructions });
+                onUserContextSaved?.();
                 // Reset status after a delay
                 setTimeout(() => setSaveStatus('idle'), 2000);
             } else {

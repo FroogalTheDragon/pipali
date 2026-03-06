@@ -122,12 +122,12 @@ function getGreeting(name?: string): string {
 }
 
 interface EmptyHomeStateProps {
-    userName?: string;
+    userFirstName?: string;
     hasInput?: boolean;
 }
 
-export function EmptyHomeState({ userName, hasInput = false }: EmptyHomeStateProps) {
-    const [greeting] = useState(() => getGreeting(userName));
+export function EmptyHomeState({ userFirstName, hasInput = false }: EmptyHomeStateProps) {
+    const [greeting] = useState(() => getGreeting(userFirstName));
 
     return (
         <div className="empty-state home-empty">

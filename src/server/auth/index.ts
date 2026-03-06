@@ -161,6 +161,44 @@ export async function getStoredTokens(): Promise<AuthTokens | null> {
 }
 
 /**
+ * Get the last known platform display name from stored auth
+ */
+export async function getStoredPlatformName(): Promise<string | null> {
+    try {
+        const [user] = await db.select().from(User).limit(1);
+        if (!user) return null;
+
+        const [auth] = await db
+            .select({ platformName: PlatformAuth.platformName })
+            .from(PlatformAuth)
+            .where(eq(PlatformAuth.userId, user.id))
+            .limit(1);
+
+        return auth?.platformName ?? null;
+    } catch (error) {
+        log.error({ err: error }, 'Failed to get stored platform name');
+        return null;
+    }
+}
+
+/**
+ * Update the stored platform display name
+ */
+export async function updateStoredPlatformName(name: string): Promise<void> {
+    try {
+        const [user] = await db.select().from(User).limit(1);
+        if (!user) return;
+
+        await db
+            .update(PlatformAuth)
+            .set({ platformName: name, updatedAt: new Date() })
+            .where(eq(PlatformAuth.userId, user.id));
+    } catch (error) {
+        log.error({ err: error }, 'Failed to update stored platform name');
+    }
+}
+
+/**
  * Store authentication tokens
  */
 export async function storeTokens(

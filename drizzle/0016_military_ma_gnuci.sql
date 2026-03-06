@@ -1,0 +1,1 @@
+ALTER TABLE "platform_auth" ADD COLUMN "platform_name" text;

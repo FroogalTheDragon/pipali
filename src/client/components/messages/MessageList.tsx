@@ -10,10 +10,10 @@ interface MessageListProps {
     conversationId?: string;
     platformFrontendUrl?: string;
     onDeleteMessage?: (messageId: string, role: 'user' | 'assistant') => void;
-    userName?: string;
+    userFirstName?: string;
 }
 
-export function MessageList({ messages, conversationId, platformFrontendUrl, onDeleteMessage, userName }: MessageListProps) {
+export function MessageList({ messages, conversationId, platformFrontendUrl, onDeleteMessage, userFirstName }: MessageListProps) {
     const lastUserMessageRef = useRef<HTMLDivElement>(null);
     const mainContentRef = useRef<HTMLElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
@@ -130,7 +130,7 @@ export function MessageList({ messages, conversationId, platformFrontendUrl, onD
         <main className="main-content" ref={mainContentRef}>
             <div className="messages-container">
                 {messages.length === 0 ? (
-                    <EmptyHomeState userName={userName} />
+                    <EmptyHomeState userFirstName={userFirstName} />
                 ) : (
                     <div className="messages" ref={messagesRef}>
                         {messages.map((msg, index) => (

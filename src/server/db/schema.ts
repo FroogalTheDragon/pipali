@@ -365,6 +365,7 @@ export const PlatformAuth = pgTable('platform_auth', {
     expiresAt: timestamp('expires_at'),
     platformUserId: text('platform_user_id'),  // UUID from platform
     platformEmail: text('platform_email'),
+    platformName: text('platform_name'),  // Last known display name from platform
     platformUrl: text('platform_url'),  // Which platform instance
     ...dbBaseModel,
 });

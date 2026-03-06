@@ -15,7 +15,6 @@ import type {
     ActiveTask,
     AuthStatus,
     BillingAlert,
-    BillingError,
 } from "./types";
 import type { PendingConfirmation } from "./types/confirmation";
 
@@ -66,14 +65,15 @@ const App = () => {
     }, []);
 
     // Fetch user context name on mount
-    useEffect(() => {
+    const fetchUserName = () => {
         apiFetch('/api/user/context')
             .then(res => res.ok ? res.json() : null)
             .then(data => {
-                if (data?.name) setUserName(data.name.split(' ')[0]);
+                setUserName(data?.name || undefined);
             })
             .catch(() => { });
-    }, []);
+    };
+    useEffect(() => { fetchUserName(); }, []);
 
     // Core state
     const [input, setInput] = useState("");
@@ -1415,6 +1415,7 @@ const App = () => {
                     exportingConversationId={exportingConversationId}
                     currentPage={currentPage}
                     authStatus={authStatus}
+                    userName={userName}
                     billingAlerts={billingAlerts}
                     platformFrontendUrl={platformFrontendUrl}
                     onNewChat={startNewConversation}
@@ -1443,7 +1444,7 @@ const App = () => {
                         <HomePage
                             activeTasks={getActiveTasks()}
                             onSelectTask={selectConversation}
-                            userName={userName ?? authStatus?.user?.name?.split(' ')[0]}
+                            userFirstName={userName?.split(' ')[0] ?? authStatus?.user?.name?.split(' ')[0]}
                             hasInput={input.trim().length > 0}
                         />
                     )}
@@ -1463,11 +1464,11 @@ const App = () => {
                         <McpToolsPage />
                     )}
                     {currentPage === 'settings' && (
-                        <SettingsPage />
+                        <SettingsPage onUserContextSaved={fetchUserName} />
                     )}
                     {currentPage === 'chat' && (
                         <ErrorBoundary>
-                            <MessageList messages={messages} conversationId={conversationId} platformFrontendUrl={platformFrontendUrl} onDeleteMessage={deleteMessage} userName={userName ?? authStatus?.user?.name?.split(' ')[0]} />
+                            <MessageList messages={messages} conversationId={conversationId} platformFrontendUrl={platformFrontendUrl} onDeleteMessage={deleteMessage} userFirstName={userName?.split(' ')[0] ?? authStatus?.user?.name?.split(' ')[0]} />
                         </ErrorBoundary>
                     )}
 

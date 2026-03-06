@@ -1,6 +1,6 @@
 {
-  "id": "6b2e771b-4c34-41d1-8b55-9d6394c89f66",
-  "prevId": "c359e2dc-8fd9-41cf-829c-59bff78c6248",
+  "id": "92952f8e-f9d2-4229-a896-08b7ab4c3f63",
+  "prevId": "6b2e771b-4c34-41d1-8b55-9d6394c89f66",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -897,6 +897,12 @@
         },
         "platform_email": {
           "name": "platform_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_name": {
+          "name": "platform_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false

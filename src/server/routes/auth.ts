@@ -7,6 +7,8 @@ import {
     getPlatformUserInfo,
     getPlatformUrl,
     getPlatformAuthCapabilities,
+    getStoredPlatformName,
+    updateStoredPlatformName,
     syncPlatformModels,
     syncPlatformWebTools,
 } from '../auth';
@@ -58,8 +60,13 @@ auth.post('/complete', async (c) => {
         syncPlatformWebTools().catch(err => log.error({ err }, 'Failed to sync platform web tools'));
 
         // Initialize user context with user info from platform (runs in background)
-        getPlatformUserInfo()
-            .then(userInfo => initializeUserContext({ name: userInfo?.name ?? undefined }))
+        // Compare against stored platform name to detect user-customized names
+        Promise.all([getPlatformUserInfo(), getStoredPlatformName()])
+            .then(async ([userInfo, previousPlatformName]) => {
+                const platformName = userInfo?.name ?? undefined;
+                await initializeUserContext({ name: platformName, previousPlatformName });
+                if (platformName) await updateStoredPlatformName(platformName);
+            })
             .catch(err => log.error({ err }, 'Failed to initialize user context'));
 
         // For desktop auth, return a flag to show "close tab" message instead of redirecting
