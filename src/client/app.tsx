@@ -78,7 +78,7 @@ const App = () => {
     const [input, setInput] = useState("");
     const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [exportingConversationId, setExportingConversationId] = useState<string | null>(null);
+    const [copyingConversationId, setCopyingConversationId] = useState<string | null>(null);
     const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
     const [userName, setUserName] = useState<string | undefined>(undefined);
     // Current page state - determine from URL
@@ -844,47 +844,57 @@ const App = () => {
         }
     };
 
-    const getFilenameFromContentDisposition = (headerValue: string | null): string | null => {
-        if (!headerValue) return null;
-        const filenameStarMatch = headerValue.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
-        if (filenameStarMatch?.[1]) {
-            try {
-                return decodeURIComponent(filenameStarMatch[1].trim().replace(/^"|"$/g, ''));
-            } catch { /* fall through */ }
-        }
-        const filenameMatch = headerValue.match(/filename=("[^"]+"|[^;]+)/i);
-        if (filenameMatch?.[1]) {
-            return filenameMatch[1].trim().replace(/^"|"$/g, '');
-        }
-        return null;
+    const copyConversationLink = (id: string) => {
+        navigator.clipboard.writeText(`pipali://chat/${id}`);
     };
 
-    const exportConversationAsATIF = async (id: string) => {
-        if (!id || exportingConversationId) return;
-        setExportingConversationId(id);
-        try {
-            const res = await apiFetch(`/api/conversations/${id}/export/atif`);
-            if (!res.ok) {
-                const text = await res.text().catch(() => '');
-                throw new Error(text || `Export failed (${res.status})`);
-            }
-            const blob = await res.blob();
-            const filename = getFilenameFromContentDisposition(res.headers.get('Content-Disposition'))
-                || `conversation_${id}.atif.json`;
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-        } catch (e) {
-            console.error('Failed to export conversation as ATIF', e);
-            alert(e instanceof Error ? e.message : 'Failed to export conversation');
-        } finally {
-            setExportingConversationId(null);
-        }
+    const copyConversationChat = (id: string) => {
+        if (!id || copyingConversationId) return;
+        setCopyingConversationId(id);
+        const blobPromise = apiFetch(`/api/conversations/${id}/export/atif`)
+            .then(async (res) => {
+                if (!res.ok) throw new Error(`Copy failed (${res.status})`);
+                const atif = await res.json();
+                const conv = conversations.find(c => c.id === id);
+                const lines: string[] = [];
+                if (conv?.title) lines.push(`# ${conv.title}`);
+                for (const step of atif.steps ?? []) {
+                    if (!step.message || (step.source !== 'user' && step.source !== 'agent')) continue;
+                    const role = step.source === 'user' ? 'User' : 'Assistant';
+                    lines.push(`## ${role}\n\n${step.message}`);
+                }
+                return new Blob([lines.join('\n\n---\n\n')], { type: 'text/plain' });
+            })
+            .catch((e) => {
+                console.error('Failed to copy conversation', e);
+                alert(e instanceof Error ? e.message : 'Failed to copy conversation');
+                return new Blob([''], { type: 'text/plain' });
+            })
+            .finally(() => setCopyingConversationId(null));
+        navigator.clipboard.write([new ClipboardItem({ 'text/plain': blobPromise })]);
+    };
+
+    const copyConversationRaw = (id: string) => {
+        if (!id || copyingConversationId) return;
+        setCopyingConversationId(id);
+        // Use ClipboardItem with a deferred blob to reserve clipboard access
+        // synchronously during the user gesture, then fulfill after the fetch.
+        const blobPromise = apiFetch(`/api/conversations/${id}/export/atif`)
+            .then(async (res) => {
+                if (!res.ok) {
+                    const text = await res.text().catch(() => '');
+                    throw new Error(text || `Copy failed (${res.status})`);
+                }
+                const text = await res.text();
+                return new Blob([text], { type: 'text/plain' });
+            })
+            .catch((e) => {
+                console.error('Failed to copy conversation', e);
+                alert(e instanceof Error ? e.message : 'Failed to copy conversation');
+                return new Blob([''], { type: 'text/plain' });
+            })
+            .finally(() => setCopyingConversationId(null));
+        navigator.clipboard.write([new ClipboardItem({ 'text/plain': blobPromise })]);
     };
 
     // ===== Chat Runtime (WebSocket via hook) =====
@@ -1412,7 +1422,7 @@ const App = () => {
                     conversationStates={conversationStates}
                     pendingConfirmations={sidebarPendingConfirmations}
                     currentConversationId={conversationId}
-                    exportingConversationId={exportingConversationId}
+                    copyingConversationId={copyingConversationId}
                     currentPage={currentPage}
                     authStatus={authStatus}
                     userName={userName}
@@ -1421,7 +1431,9 @@ const App = () => {
                     onNewChat={startNewConversation}
                     onSelectConversation={selectConversation}
                     onDeleteConversation={deleteConversation}
-                    onExportConversation={exportConversationAsATIF}
+                    onCopyConversationLink={copyConversationLink}
+                    onCopyConversationChat={copyConversationChat}
+                    onCopyConversationRaw={copyConversationRaw}
                     onRenameConversation={renameConversation}
                     onPinConversation={pinConversation}
                     onGoToSkills={goToSkillsPage}

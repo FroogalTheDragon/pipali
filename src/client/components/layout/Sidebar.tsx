@@ -1,7 +1,7 @@
 // Sidebar with conversation list
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, MessageSquare, AlertCircle, CheckCircle, Plus, MoreVertical, Download, Trash2, ChevronRight, Search, X, Zap, Clock, Hammer, Settings, User, LogOut, Shield, Sun, Moon, Monitor, Pencil, Pin, PinOff } from 'lucide-react';
+import { Loader2, MessageSquare, AlertCircle, CheckCircle, Plus, MoreVertical, Trash2, ChevronRight, Search, X, Zap, Clock, Hammer, Settings, User, LogOut, Shield, Sun, Moon, Monitor, Pencil, Pin, PinOff, Copy, Link, FileText } from 'lucide-react';
 import type { ConversationSummary, ConversationState, ConfirmationRequest, AuthStatus, BillingAlert } from '../../types';
 import { useTheme } from '../../hooks';
 import { BillingAlertBanner } from '../billing';
@@ -45,7 +45,7 @@ interface SidebarProps {
     conversationStates: Map<string, ConversationState>;
     pendingConfirmations: Map<string, ConfirmationRequest[]>;
     currentConversationId?: string;
-    exportingConversationId: string | null;
+    copyingConversationId: string | null;
     currentPage?: 'home' | 'chat' | 'skills' | 'automations' | 'mcp-tools' | 'settings';
     authStatus?: AuthStatus | null;
     userName?: string;
@@ -54,7 +54,9 @@ interface SidebarProps {
     onNewChat: () => void;
     onSelectConversation: (id: string, highlightTerm?: string) => void;
     onDeleteConversation: (id: string, e: React.MouseEvent) => void;
-    onExportConversation: (id: string) => void;
+    onCopyConversationLink: (id: string) => void;
+    onCopyConversationChat: (id: string) => void;
+    onCopyConversationRaw: (id: string) => void;
     onRenameConversation: (id: string, title: string) => Promise<boolean>;
     onPinConversation: (id: string, isPinned: boolean) => void;
     onGoToSkills?: () => void;
@@ -72,7 +74,7 @@ export function Sidebar({
     conversationStates,
     pendingConfirmations,
     currentConversationId,
-    exportingConversationId,
+    copyingConversationId,
     currentPage,
     authStatus,
     userName,
@@ -81,7 +83,9 @@ export function Sidebar({
     onNewChat,
     onSelectConversation,
     onDeleteConversation,
-    onExportConversation,
+    onCopyConversationLink,
+    onCopyConversationChat,
+    onCopyConversationRaw,
     onRenameConversation,
     onPinConversation,
     onGoToSkills,
@@ -94,6 +98,7 @@ export function Sidebar({
 }: SidebarProps) {
     const [openConversationMenuId, setOpenConversationMenuId] = useState<string | null>(null);
     const [openMenuContext, setOpenMenuContext] = useState<'sidebar' | 'modal' | null>(null);
+    const [showCopySubmenu, setShowCopySubmenu] = useState(false);
     const [showAllChatsModal, setShowAllChatsModal] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -135,6 +140,7 @@ export function Sidebar({
             if (!target.closest('.conversation-menu-container')) {
                 setOpenConversationMenuId(null);
                 setOpenMenuContext(null);
+                setShowCopySubmenu(false);
             }
             // Close user menu
             if (!target.closest('.user-profile-container')) {
@@ -247,6 +253,7 @@ export function Sidebar({
 
     const toggleConversationMenu = (id: string, e: React.MouseEvent, context: 'sidebar' | 'modal') => {
         e.stopPropagation();
+        setShowCopySubmenu(false);
         if (openConversationMenuId === id && openMenuContext === context) {
             setOpenConversationMenuId(null);
             setOpenMenuContext(null);
@@ -478,24 +485,71 @@ export function Sidebar({
                                 <span>{conv.isPinned ? 'Unpin' : 'Pin'}</span>
                             </button>
 
-                            <button
-                                className="conversation-menu-item"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenConversationMenuId(null);
-                                    setOpenMenuContext(null);
-                                    onExportConversation(conv.id);
-                                }}
-                                disabled={exportingConversationId === conv.id}
-                                role="menuitem"
-                            >
-                                {exportingConversationId === conv.id ? (
-                                    <Loader2 size={14} className="spinning" />
-                                ) : (
-                                    <Download size={14} />
-                                )}
-                                <span>Export</span>
-                            </button>
+                            <div className={`conversation-menu-submenu-container ${showCopySubmenu ? 'open' : ''}`}>
+                                <button
+                                    className="conversation-menu-item"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowCopySubmenu(prev => !prev);
+                                    }}
+                                    role="menuitem"
+                                >
+                                    <Copy size={14} />
+                                    <span>Copy</span>
+                                    <ChevronRight size={12} className="submenu-arrow" />
+                                </button>
+                                <div className="conversation-submenu" role="menu">
+                                    <button
+                                        className="conversation-menu-item"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenConversationMenuId(null);
+                                            setOpenMenuContext(null);
+                                            onCopyConversationLink(conv.id);
+                                        }}
+                                        role="menuitem"
+                                    >
+                                        <Link size={14} />
+                                        <span>Link</span>
+                                    </button>
+                                    <button
+                                        className="conversation-menu-item"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenConversationMenuId(null);
+                                            setOpenMenuContext(null);
+                                            onCopyConversationChat(conv.id);
+                                        }}
+                                        disabled={copyingConversationId === conv.id}
+                                        role="menuitem"
+                                    >
+                                        {copyingConversationId === conv.id ? (
+                                            <Loader2 size={14} className="spinning" />
+                                        ) : (
+                                            <MessageSquare size={14} />
+                                        )}
+                                        <span>Messages</span>
+                                    </button>
+                                    <button
+                                        className="conversation-menu-item"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenConversationMenuId(null);
+                                            setOpenMenuContext(null);
+                                            onCopyConversationRaw(conv.id);
+                                        }}
+                                        disabled={copyingConversationId === conv.id}
+                                        role="menuitem"
+                                    >
+                                        {copyingConversationId === conv.id ? (
+                                            <Loader2 size={14} className="spinning" />
+                                        ) : (
+                                            <FileText size={14} />
+                                        )}
+                                        <span>Trace</span>
+                                    </button>
+                                </div>
+                            </div>
 
                             <button
                                 className="conversation-menu-item danger"

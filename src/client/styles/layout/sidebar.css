@@ -470,6 +470,28 @@
     background: var(--color-error-bg);
 }
 
+.conversation-menu-submenu-container > .conversation-menu-item .submenu-arrow {
+    margin-left: auto;
+    opacity: 0.5;
+    transition: transform var(--transition);
+}
+
+.conversation-menu-submenu-container.open > .conversation-menu-item .submenu-arrow {
+    transform: rotate(90deg);
+}
+
+.conversation-submenu {
+    display: none;
+}
+
+.conversation-menu-submenu-container.open > .conversation-submenu {
+    display: block;
+}
+
+.conversation-submenu .conversation-menu-item {
+    padding-left: 24px;
+}
+
 .no-conversations {
     padding: 24px 12px;
     text-align: center;
