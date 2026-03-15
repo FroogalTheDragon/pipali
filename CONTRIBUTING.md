@@ -7,6 +7,29 @@
 - [Bun](https://bun.sh) v1.2.19+
 - A [Pipali](https://pipali.ai) account
 
+#### Linux Sandbox Dependencies
+
+The OS-enforced sandbox on Linux uses [bubblewrap](https://github.com/containers/bubblewrap). Install these system packages to enable it:
+
+```bash
+# Fedora/RHEL
+sudo dnf install -y bubblewrap ripgrep socat
+
+# Debian/Ubuntu
+sudo apt install -y bubblewrap ripgrep socat
+
+# Arch
+sudo pacman -S bubblewrap ripgrep socat
+```
+
+| Package | Purpose |
+|---|---|
+| `bubblewrap` (bwrap) | Filesystem and network namespace isolation |
+| `ripgrep` (rg) | Scans for dangerous files within allowed write paths |
+| `socat` | Bridges network traffic through the sandbox proxy |
+
+Without these, the sandbox is disabled and all shell commands will require manual confirmation.
+
 ### Install and Run
 
 ```bash
@@ -36,6 +59,12 @@ Copy `.env.example` to `.env`. The app auto-loads `.env` via Bun — no dotenv n
 ```bash
 bun test             # Unit tests
 bun run test:e2e     # E2E tests (Playwright)
+```
+
+To run the OS-level sandbox enforcement tests (skipped by default):
+
+```bash
+SANDBOX_INTEGRATION_TESTS=true bun test tests/server/sandbox/enforcement.test.ts
 ```
 
 ### Database
