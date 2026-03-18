@@ -90,7 +90,7 @@ export const DEFAULT_DENIED_READ_PATHS: string[] = [
     '/etc',
     '/var/log',
     '/private/etc',  // macOS
-    '/private/var',  // macOS
+    '/private/var/log',  // macOS (not /private/var — it contains $TMPDIR on macOS)
 ];
 
 /**
