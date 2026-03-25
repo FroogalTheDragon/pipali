@@ -1,7 +1,7 @@
 /**
  * Notification utilities for Pipali.
- * Uses Web Notification API for both Tauri desktop app and browser.
- * Triggers notifications when user attention is required and the app window is not focused.
+ * In Tauri desktop app, sends native macOS notifications via Rust command with click handling.
+ * In browser, uses Web Notification API.
  */
 
 import { isTauri } from './tauri';
@@ -57,15 +57,9 @@ function playNotificationSound(): void {
 // Track active web notifications for cleanup
 const activeWebNotifications: Map<string, Notification> = new Map();
 
-// Pending conversation ID to navigate to when window gains focus (for Tauri notification click workaround)
-let pendingNavigationConversationId: string | null = null;
-
 // Callback for when a notification is clicked (used for navigation)
 type NotificationClickHandler = (conversationId: string) => void;
 let notificationClickHandler: NotificationClickHandler | null = null;
-
-// Track if we've set up the focus listener
-let focusListenerSetup = false;
 
 /**
  * Register a handler for notification clicks.
@@ -97,7 +91,6 @@ function sendWebNotification(tag: string, title: string, body: string, conversat
         });
 
         notification.onclick = async () => {
-            // Focus the window (handles both Tauri and web)
             await focusAppWindow();
             notification.close();
             activeWebNotifications.delete(tag);
@@ -131,29 +124,30 @@ export function isWindowFocused(): boolean {
 }
 
 /**
+ * Send a native notification via the Rust backend.
+ * Click handling is done via the `notification-clicked` Tauri event.
+ */
+async function sendTauriNotification(title: string, body: string, conversationId?: string): Promise<void> {
+    try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('send_notification', {
+            options: { title, body, conversationId: conversationId ?? null },
+        });
+    } catch (err) {
+        console.warn('[notifications] Failed to send native notification:', err);
+    }
+}
+
+/**
  * Initialize notification permissions.
  * Call this once when the app starts.
  */
 export async function initNotifications(): Promise<boolean> {
-    // Tauri path - use native notifications
+    // Tauri desktop app — Rust handles native notifications via UNUserNotificationCenter.
+    // Permission is requested on the Rust side during app init.
     if (isTauri()) {
-        try {
-            const { isPermissionGranted, requestPermission } =
-                await import('@tauri-apps/plugin-notification');
-
-            let granted = await isPermissionGranted();
-
-            if (!granted) {
-                const result = await requestPermission();
-                granted = result === 'granted';
-            }
-
-            notificationPermissionGranted = granted;
-            return granted;
-        } catch (err) {
-            console.warn('[notifications] Failed to initialize Tauri notifications:', err);
-            return false;
-        }
+        notificationPermissionGranted = true;
+        return true;
     }
 
     // Web path - use Web Notification API
@@ -173,7 +167,6 @@ export async function initNotifications(): Promise<boolean> {
         return false;
     }
 
-    // Permission is 'default' - request permission
     try {
         const result = await Notification.requestPermission();
         notificationPermissionGranted = result === 'granted';
@@ -187,8 +180,6 @@ export async function initNotifications(): Promise<boolean> {
 
 /**
  * Send a notification for a confirmation request.
- * In Tauri, uses native notifications with focus-based navigation workaround.
- * In browser, uses Web Notification API with onclick handler.
  * Only sends if window is not focused.
  *
  * @param request - The confirmation request
@@ -212,10 +203,7 @@ export async function notifyConfirmationRequest(
     if (notificationPermissionGranted === null) {
         await initNotifications();
     }
-
-    if (!notificationPermissionGranted) {
-        return;
-    }
+    if (!notificationPermissionGranted) return;
 
     // Build notification content
     const title = request.operation === 'ask_user'
@@ -226,21 +214,11 @@ export async function notifyConfirmationRequest(
         ? `${conversationTitle}: ${request.title}`
         : request.title;
 
-    // Tauri path - use native notifications with pending navigation
-    if (isTauri() && conversationId) {
-        try {
-            const { sendNotification } = await import('@tauri-apps/plugin-notification');
-            // Tauri notification onclick doesn't work (known limitation),
-            // so we store the conversation ID and navigate when the app regains focus
-            sendNotification({ title, body });
-            pendingNavigationConversationId = conversationId;
-        } catch (err) {
-            console.warn('[notifications] Failed to send Tauri notification:', err);
-        }
+    if (isTauri()) {
+        await sendTauriNotification(title, body, conversationId);
         return;
     }
 
-    // Web/Tauri fallback path - use Web Notification API with onclick handler
     const tag = `confirmation-${request.requestId}`;
     sendWebNotification(tag, title, body, conversationId);
 }
@@ -259,10 +237,7 @@ export async function notifyTaskComplete(
     responseSnippet?: string,
     conversationId?: string
 ): Promise<void> {
-    // Don't notify if window is focused - user can see the result
-    if (isWindowFocused()) {
-        return;
-    }
+    if (isWindowFocused()) return;
 
     playNotificationSound();
 
@@ -270,10 +245,7 @@ export async function notifyTaskComplete(
     if (notificationPermissionGranted === null) {
         await initNotifications();
     }
-
-    if (!notificationPermissionGranted) {
-        return;
-    }
+    if (!notificationPermissionGranted) return;
 
     // Build notification content
     const title = userRequest
@@ -284,7 +256,11 @@ export async function notifyTaskComplete(
         ? truncate(responseSnippet, 100)
         : 'Your task has finished';
 
-    // Use Web Notification API directly (allows onclick handlers for navigation)
+    if (isTauri()) {
+        await sendTauriNotification(title, body, conversationId);
+        return;
+    }
+
     const tag = `task-complete-${Date.now()}`;
     sendWebNotification(tag, title, body, conversationId);
 }
@@ -295,9 +271,7 @@ export async function notifyTaskComplete(
 function truncate(text: string, maxLength: number): string {
     // Normalize whitespace (collapse newlines and multiple spaces)
     const normalized = text.replace(/\s+/g, ' ').trim();
-    if (normalized.length <= maxLength) {
-        return normalized;
-    }
+    if (normalized.length <= maxLength) return normalized;
     return normalized.slice(0, maxLength - 1) + '…';
 }
 
@@ -307,7 +281,6 @@ function truncate(text: string, maxLength: number): string {
  * In browser, uses window.focus().
  */
 export async function focusAppWindow(): Promise<void> {
-    // Tauri path - use focus_window command which handles dock visibility
     if (isTauri()) {
         try {
             const { invoke } = await import('@tauri-apps/api/core');
@@ -318,54 +291,23 @@ export async function focusAppWindow(): Promise<void> {
         return;
     }
 
-    // Web path - focus the browser window/tab
     window.focus();
 }
 
 /**
- * Check if there's a pending conversation to navigate to and consume it.
- * Returns the conversation ID if one was pending, null otherwise.
+ * Setup listener for the `notification-clicked` Tauri event.
+ * When the Rust backend detects a notification click, it emits this event
+ * with the conversation ID, and we navigate to that conversation.
  */
-function consumePendingNavigation(): string | null {
-    const convId = pendingNavigationConversationId;
-    pendingNavigationConversationId = null;
-    return convId;
-}
+export function setupNotificationClickListener(): void {
+    if (!isTauri()) return;
 
-/**
- * Setup a listener for window focus events to handle pending navigation.
- * When the app gains focus after a Tauri notification was clicked, this will
- * call the notification click handler with the pending conversation ID.
- *
- * This is a workaround for Tauri's notification onclick not working.
- */
-export function setupFocusNavigationListener(): void {
-    if (focusListenerSetup) {
-        return;
-    }
-    focusListenerSetup = true;
-
-    // Listen for visibility change (works when app comes to foreground)
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            const convId = consumePendingNavigation();
+    import('@tauri-apps/api/event').then(({ listen }) => {
+        listen<string>('notification-clicked', (event) => {
+            const convId = event.payload;
             if (convId && notificationClickHandler) {
-                // Small delay to ensure the window is fully focused
-                setTimeout(() => {
-                    notificationClickHandler?.(convId);
-                }, 100);
+                notificationClickHandler(convId);
             }
-        }
-    });
-
-    // Also listen for window focus (backup)
-    window.addEventListener('focus', () => {
-        const convId = consumePendingNavigation();
-        if (convId && notificationClickHandler) {
-            setTimeout(() => {
-                notificationClickHandler?.(convId);
-            }, 100);
-        }
+        });
     });
 }
-

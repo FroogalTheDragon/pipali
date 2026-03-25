@@ -1,4 +1,5 @@
 mod commands;
+mod notification;
 mod wake_lock;
 
 use std::sync::Mutex;
@@ -425,7 +426,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -486,6 +486,10 @@ pub fn run() {
             // Initialize wake lock state with data directory so preference persists across restarts
             let wake_state: State<wake_lock::WakeLockState> = app.state();
             wake_state.init(&data_dir);
+
+            // Initialize native notification delegate for click handling
+            #[cfg(target_os = "macos")]
+            notification::macos_init(&handle);
 
             // Show app in dock immediately
             show_in_dock(&handle);
@@ -625,7 +629,8 @@ pub fn run() {
             commands::focus_window,
             commands::get_dropped_file_metadata,
             wake_lock::acquire_wake_lock,
-            wake_lock::release_wake_lock
+            wake_lock::release_wake_lock,
+            notification::send_notification
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
