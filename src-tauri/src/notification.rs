@@ -17,6 +17,7 @@ pub fn macos_init(app: &AppHandle) {
 
 /// Send a notification and handle click to show the app window.
 /// On macOS, uses UNUserNotificationCenter with a delegate for click-to-conversation navigation.
+/// On Windows, uses WinRT toast notifications with on_activated callback.
 #[tauri::command]
 pub async fn send_notification(app: AppHandle, options: NotificationOptions) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -24,7 +25,12 @@ pub async fn send_notification(app: AppHandle, options: NotificationOptions) -> 
         macos::send(app, options)
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        windows::send(app, options)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = (app, options);
         Ok(())
@@ -198,5 +204,55 @@ mod macos {
         center.addNotificationRequest_withCompletionHandler(&request, Some(&completion));
 
         Ok(())
+    }
+}
+
+#[cfg(target_os = "windows")]
+mod windows {
+    use super::*;
+    use tauri_winrt_notification::Toast;
+
+    pub fn send(app: AppHandle, options: NotificationOptions) -> Result<(), String> {
+        log::info!(
+            "[Notification] Sending: title={}, body={}",
+            options.title,
+            options.body
+        );
+
+        let conv_id = options.conversation_id.clone();
+
+        // Toast::new requires the app's AUMID (Application User Model ID).
+        // Tauri sets this to the `identifier` from tauri.conf.json during installation.
+        // For dev/debug builds, fall back to PowerShell's AUMID so toasts still work.
+        let app_id = if cfg!(debug_assertions) {
+            Toast::POWERSHELL_APP_ID
+        } else {
+            "ai.pipali"
+        };
+
+        let result = Toast::new(app_id)
+            .title(&options.title)
+            .text1(&options.body)
+            .on_activated({
+                let app = app.clone();
+                move |_action| {
+                    log::info!("[Notification] Clicked");
+                    crate::show_window(&app);
+                    if let Some(ref conv_id) = conv_id {
+                        log::info!("[Notification] Navigating to conversation: {}", conv_id);
+                        let _ = app.emit("notification-clicked", conv_id.clone());
+                    }
+                    Ok(())
+                }
+            })
+            .show();
+
+        if let Err(ref e) = result {
+            log::error!("[Notification] Failed to send: {:?}", e);
+        }
+
+        result
+            .map(|_| ())
+            .map_err(|e| format!("Failed to send notification: {:?}", e))
     }
 }
