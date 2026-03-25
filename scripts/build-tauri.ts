@@ -626,14 +626,15 @@ async function buildTauri(debug: boolean, platform: Platform, disableUpdaterArti
         throw new Error(`Tauri build failed with exit code ${exitCode}`);
     }
 
-    // Re-sign macOS app bundle with correct bundle identifier and entitlements.
+    // Re-sign macOS debug builds with correct bundle identifier and entitlements.
     // Tauri debug builds use linker-signed ad-hoc signing with an auto-generated identifier,
     // which prevents UNUserNotificationCenter from granting notification authorization.
-    if (platform.startsWith("darwin")) {
-        const mode = debug ? "debug" : "release";
-        const appPath = path.join(ROOT_DIR, "src-tauri", "target", mode, "bundle", "macos", "Pipali.app");
+    // Skip for release builds — Tauri signs with the Developer ID certificate via
+    // APPLE_SIGNING_IDENTITY and ad-hoc re-signing would destroy that signature.
+    if (platform.startsWith("darwin") && debug) {
+        const appPath = path.join(ROOT_DIR, "src-tauri", "target", "debug", "bundle", "macos", "Pipali.app");
         const entitlements = path.join(ROOT_DIR, "src-tauri", "Entitlements.plist");
-        console.log("🔏 Re-signing app bundle with correct bundle identifier...");
+        console.log("🔏 Re-signing debug app bundle with correct bundle identifier...");
         const signProc = Bun.spawn([
             "codesign", "--force", "--deep", "--sign", "-",
             "--identifier", "ai.pipali",
