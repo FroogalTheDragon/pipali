@@ -73,7 +73,7 @@ export async function initializeSandbox(): Promise<void> {
 
         // Check if sandboxing is supported on this platform
         const platform = getPlatformType();
-        const supported = SandboxManager.isSupportedPlatform(platform);
+        const supported = SandboxManager.isSupportedPlatform();
 
         if (!supported) {
             log.info(`Sandbox not supported on ${platform}, will use confirmation-based security`);
@@ -142,7 +142,7 @@ export async function reloadSandboxConfig(): Promise<void> {
     }
 
     const platform = getPlatformType();
-    if (!SandboxManager.isSupportedPlatform(platform)) {
+    if (!SandboxManager.isSupportedPlatform()) {
         return;
     }
 
@@ -164,7 +164,7 @@ export function isSandboxEnabled(): boolean {
  */
 export function isSandboxSupported(): boolean {
     const platform = getPlatformType();
-    return SandboxManager.isSupportedPlatform(platform);
+    return SandboxManager.isSupportedPlatform();
 }
 
 /**
