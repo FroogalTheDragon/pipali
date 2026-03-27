@@ -9,6 +9,7 @@ import { BillingAlertBanner } from '../billing';
 import { apiFetch } from '../../utils/api';
 
 import { MOD_KEY } from '../../utils/platform';
+import { openInBrowser } from '../../utils/tauri';
 
 const MAX_VISIBLE_CHATS = 5;
 
@@ -890,8 +891,7 @@ export function Sidebar({
                         <div className="changelog-footer">
                             <a
                                 href="https://github.com/khoj-ai/pipali/releases"
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                onClick={(e) => { e.preventDefault(); openInBrowser("https://github.com/khoj-ai/pipali/releases"); }}
                             >
                                 Previous release notes
                             </a>
