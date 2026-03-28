@@ -1,6 +1,6 @@
 [package]
 name = "pipali"
-version = "0.3.0"
+version = "0.4.0"
 description = "Pipali - Personal AI for knowledge work. Make work easy."
 authors = ["Khoj"]
 edition = "2021"
@@ -16,7 +16,6 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2.5"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
-tauri-plugin-notification = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-updater = "2"
@@ -27,6 +26,26 @@ log = "0.4"
 env_logger = "0.11"
 ureq = "2"
 keepawake = "0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSError", "NSDictionary"] }
+objc2-user-notifications = { version = "0.3", default-features = false, features = [
+    "std",
+    "bitflags",
+    "block2",
+    "UNUserNotificationCenter",
+    "UNNotificationResponse",
+    "UNNotificationContent",
+    "UNNotificationRequest",
+    "UNNotificationTrigger",
+    "UNNotification",
+    "UNNotificationSettings",
+] }
+block2 = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+tauri-winrt-notification = "0.7"
 
 [profile.release]
 panic = "abort"

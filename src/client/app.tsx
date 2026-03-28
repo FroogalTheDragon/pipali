@@ -24,7 +24,7 @@ import { useFocusManagement, useFileDrop, useModels, useSidecar, useWebSocketCha
 // Utils
 import { setApiBaseUrl, apiFetch } from "./utils/api";
 import { generateUUID, generateDeterministicId, getToolCategory, type ToolCategory } from "./utils/formatting";
-import { initNotifications, notifyConfirmationRequest, notifyTaskComplete, setNotificationClickHandler, setupFocusNavigationListener } from "./utils/notifications";
+import { initNotifications, notifyConfirmationRequest, notifyTaskComplete, setNotificationClickHandler, setupNotificationClickListener } from "./utils/notifications";
 import { isTauri, onWindowShown, onSidecarReady, listenForDeepLinks } from "./utils/tauri";
 
 // Components
@@ -343,10 +343,8 @@ const App = () => {
             scheduleTextareaFocus();
         });
 
-        // Setup focus listener for Tauri notification click navigation workaround
-        // When user clicks a Tauri notification, the app gains focus and this listener
-        // will navigate to the pending conversation
-        setupFocusNavigationListener();
+        // Listen for notification-clicked events from Rust backend (macOS/Windows)
+        setupNotificationClickListener();
 
         return () => {
             setNotificationClickHandler(null);

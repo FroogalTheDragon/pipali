@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+### 🎁 New
+- Copy link, messages, or raw trace of any chat from the sidebar menu
+- Toggle which skills are visible to Pipali from the skills page
+
+### 🧪 Improve
+- Click Pipali OS notification to open the app to that conversation on Windows and Mac
+- Show app version and what's new in app from user profile menu in sidebar
+
+### 🛠️ Fix
+- Enable Pipali to use Chrome browser on more machine setups
+- Fix shell sandbox to allow reads from the temp directory
+
 ## 0.3.0
 
 ### 🎁 New

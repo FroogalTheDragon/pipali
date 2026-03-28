@@ -413,6 +413,13 @@ async function buildServerBundle() {
         path.join(stylesDir, "index.css")
     );
 
+    // Copy CHANGELOG.md for the "What's New" feature
+    console.log("   Copying CHANGELOG.md...");
+    await fs.copyFile(
+        path.join(ROOT_DIR, "CHANGELOG.md"),
+        path.join(serverResourceDir, "CHANGELOG.md")
+    );
+
     // Create a minimal package.json with only the external dependencies
     const minimalPackageJson = {
         name: "pipali-server",
@@ -624,6 +631,27 @@ async function buildTauri(debug: boolean, platform: Platform, disableUpdaterArti
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
         throw new Error(`Tauri build failed with exit code ${exitCode}`);
+    }
+
+    // Re-sign macOS debug builds with correct bundle identifier and entitlements.
+    // Tauri debug builds use linker-signed ad-hoc signing with an auto-generated identifier,
+    // which prevents UNUserNotificationCenter from granting notification authorization.
+    // Skip for release builds — Tauri signs with the Developer ID certificate via
+    // APPLE_SIGNING_IDENTITY and ad-hoc re-signing would destroy that signature.
+    if (platform.startsWith("darwin") && debug) {
+        const appPath = path.join(ROOT_DIR, "src-tauri", "target", "debug", "bundle", "macos", "Pipali.app");
+        const entitlements = path.join(ROOT_DIR, "src-tauri", "Entitlements.plist");
+        console.log("🔏 Re-signing debug app bundle with correct bundle identifier...");
+        const signProc = Bun.spawn([
+            "codesign", "--force", "--deep", "--sign", "-",
+            "--identifier", "ai.pipali",
+            "--entitlements", entitlements,
+            appPath,
+        ], { stdout: "inherit", stderr: "inherit" });
+        const signExitCode = await signProc.exited;
+        if (signExitCode !== 0) {
+            console.warn("⚠️  Re-signing failed — notifications may not work");
+        }
     }
 
     console.log("✅ Tauri app built successfully");
