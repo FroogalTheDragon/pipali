@@ -23,6 +23,27 @@ fi
 
 script=$(readlink -f "$0")
 
+# This function deletes the old bun binary after linux deploy runs ldd
+# It removes the old binary, pulls down a fresh one and installs it
+replace_bun_binary() {
+    # Delete corrupt bun binary
+    rm -rf "$APPDIR"/usr/bin/bun
+
+    # Use the same version as the build environment
+    BUN_VERSION=$(bun --version);
+
+    # Pull down a fresh one and install it
+    curl -L -o /tmp/bun.zip https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip
+    unzip -oq /tmp/bun.zip -d /tmp/
+    mv /tmp/bun-linux-x64/bun "$APPDIR"/usr/bin && chmod +x "$APPDIR"/usr/bin/bun
+
+    # Cleanup
+    rm -rf /tmp/bun.zip && rm -rf /tmp/bun-linux-x64
+
+    # set write permission on lib64 again to make it deletable.
+    chmod +w "$APPDIR"/usr/lib64 || true
+}
+
 show_usage() {
     echo "Usage: $script --appdir <path to AppDir>"
     echo
@@ -185,7 +206,7 @@ echo "Installing AppRun hook"
 HOOKSDIR="$APPDIR/apprun-hooks"
 HOOKFILE="$HOOKSDIR/linuxdeploy-plugin-gtk.sh"
 mkdir -p "$HOOKSDIR"
-cat > "$HOOKFILE" <<\EOF
+cat > "$HOOKFILE" <<EOF
 #! /usr/bin/env bash
 
 gsettings get org.gnome.desktop.interface gtk-theme 2> /dev/null | grep -qi "dark" && GTK_THEME_VARIANT="dark" || GTK_THEME_VARIANT="light"
@@ -339,8 +360,8 @@ for directory in "${PATCH_ARRAY[@]}"; do
     done < <(find "$directory" -name '*.so' -print0)
 done
 
-# set write permission on lib64 again to make it deletable.
-chmod +w "$APPDIR"/usr/lib64 || true
+# Replace the corrupt bun binary
+replace_bun_binary;
 
 # We have to copy the files first to not get permission errors when we assign gio_extras_dir
 find /usr/lib* -name libgiognutls.so -exec mkdir -p "$APPDIR"/"$(dirname '{}')" \; -exec cp --parents '{}' "$APPDIR/" \; || true
