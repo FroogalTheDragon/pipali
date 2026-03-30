@@ -40,8 +40,9 @@ replace_bun_binary() {
     # Cleanup
     rm -rf /tmp/bun.zip && rm -rf /tmp/bun-linux-x64
 
-    # set write permission on lib64 again to make it deletable.
-    chmod +w "$APPDIR"/usr/lib64 || true
+    # set write permission on lib dir again to make it deletable.
+    # Some distros use lib64 (Fedora, RHEL), others use lib (Debian, Ubuntu).
+    chmod +w "$APPDIR"/usr/lib64 2>/dev/null || chmod +w "$APPDIR"/usr/lib 2>/dev/null || true
 }
 
 show_usage() {
