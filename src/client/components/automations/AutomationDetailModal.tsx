@@ -7,6 +7,9 @@ import { DAYS_OF_WEEK, TIME_OPTIONS, DAY_OF_MONTH_OPTIONS, MINUTE_OPTIONS } from
 import { DiffView } from '../tool-views/DiffView';
 import { shortenHomePath } from '../../utils/formatting';
 import { apiFetch } from '../../utils/api';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import i18n from '../../i18n';
 
 interface AutomationDetailModalProps {
     automation: AutomationInfo;
@@ -18,12 +21,6 @@ interface AutomationDetailModalProps {
     onViewConversation?: (conversationId: string) => void;
 }
 
-const FREQUENCY_OPTIONS: { value: FrequencyType; label: string }[] = [
-    { value: 'hour', label: 'Hour' },
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-];
 
 // Parse cron schedule to UI state
 function parseCronSchedule(schedule: string): {
@@ -95,17 +92,17 @@ function buildCronSchedule(
 }
 
 // Format schedule for display
-function formatSchedule(automation: AutomationInfo): string {
+function formatSchedule(automation: AutomationInfo, t: TFunction): string {
     if (!automation.triggerType || !automation.triggerConfig) {
-        return 'Manual only';
+        return t('automations.manualOnly');
     }
 
     if (automation.triggerType !== 'cron') {
-        return 'File watch trigger';
+        return t('automations.fileWatchTrigger');
     }
 
     const config = automation.triggerConfig;
-    if (config.type !== 'cron') return 'Unknown schedule';
+    if (config.type !== 'cron') return t('automations.unknownSchedule');
 
     const parts = config.schedule.split(' ');
     if (parts.length !== 5) return config.schedule;
@@ -117,29 +114,39 @@ function formatSchedule(automation: AutomationInfo): string {
 
     // Handle hourly schedule
     if (hour === '*') {
-        return `Every hour at :${minute.padStart(2, '0')}`;
+        return t('automations.everyHourAt', { minute: minute.padStart(2, '0') });
     }
 
     const hourNum = parseInt(hour, 10);
-    const hour12 = hourNum % 12 || 12;
-    const period = hourNum < 12 ? 'AM' : 'PM';
-    const timeStr = `${hour12}:${minute.padStart(2, '0')} ${period}`;
+    const formatTime = (h: number, m: string) => {
+        const am = t('automations.timePeriodAM');
+        const pm = t('automations.timePeriodPM');
+        if (!am && !pm) return `${h.toString().padStart(2, '0')}:${m.padStart(2, '0')}`;
+        const h12 = h % 12 || 12;
+        return `${h12}:${m.padStart(2, '0')} ${h < 12 ? am : pm}`;
+    };
+    const timeStr = formatTime(hourNum, minute);
 
     if (dayOfMonth === '*' && dayOfWeek === '*') {
-        return `Every day at ${timeStr}`;
+        return t('automations.everyDayAt', { time: timeStr });
     }
 
     if (dayOfMonth === '*' && dayOfWeek !== '*') {
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const dayName = days[parseInt(dayOfWeek, 10)] ?? dayOfWeek;
-        return `Every ${dayName} at ${timeStr}`;
+        const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayKey = dayKeys[parseInt(dayOfWeek, 10)] ?? 'sunday';
+        const dayName = t(`automations.days.${dayKey}`);
+        return t('automations.everyDayOfWeekAt', { day: dayName, time: timeStr });
     }
 
     if (dayOfMonth !== '*') {
-        const suffix = ['th', 'st', 'nd', 'rd'];
         const dom = parseInt(dayOfMonth, 10);
-        const s = suffix[(dom % 10 <= 3 && Math.floor(dom / 10) !== 1) ? dom % 10 : 0];
-        return `Every ${dom}${s} of the month at ${timeStr}`;
+        let dayStr = `${dom}`;
+        if (i18n.language.startsWith('en')) {
+            const suffixes = ['th', 'st', 'nd', 'rd'];
+            const v = dom % 100;
+            dayStr = `${dom}${suffixes[(v >= 11 && v <= 13) ? 0 : Math.min(v % 10, 4) > 3 ? 0 : v % 10]}`;
+        }
+        return t('automations.everyDayOfMonthAt', { day: dayStr, time: timeStr });
     }
 
     return config.schedule;
@@ -154,6 +161,17 @@ export function AutomationDetailModal({
     onConfirmationRespond,
     onViewConversation,
 }: AutomationDetailModalProps) {
+    const { t } = useTranslation();
+    const onTheLabel = t('automations.onThe');
+    const atLabel = t('automations.at');
+
+    const FREQUENCY_OPTIONS: { value: FrequencyType; label: string }[] = [
+        { value: 'hour', label: t('automations.frequencyHour') },
+        { value: 'day', label: t('automations.frequencyDay') },
+        { value: 'week', label: t('automations.frequencyWeek') },
+        { value: 'month', label: t('automations.frequencyMonth') },
+    ];
+
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
@@ -199,10 +217,10 @@ export function AutomationDetailModal({
                 onUpdated();
             } else {
                 const data = await res.json();
-                setError(typeof data.error === 'string' ? data.error : 'Failed to update routine status');
+                setError(typeof data.error === 'string' ? data.error : t('automations.failedToUpdateStatus'));
             }
         } catch (e) {
-            setError('Failed to update routine status');
+            setError(t('automations.failedToUpdateStatus'));
         } finally {
             setIsToggling(false);
         }
@@ -223,10 +241,10 @@ export function AutomationDetailModal({
                     onViewConversation(data.conversationId);
                 }
             } else {
-                setError(typeof data.error === 'string' ? data.error : 'Failed to trigger routine');
+                setError(typeof data.error === 'string' ? data.error : t('automations.failedToTrigger'));
             }
         } catch (e) {
-            setError('Failed to trigger routine');
+            setError(t('automations.failedToTrigger'));
         } finally {
             setIsTriggering(false);
         }
@@ -268,10 +286,10 @@ export function AutomationDetailModal({
                 onUpdated();
             } else {
                 const data = await res.json();
-                setError(typeof data.error === 'string' ? data.error : 'Failed to save routine');
+                setError(typeof data.error === 'string' ? data.error : t('automations.failedToSave'));
             }
         } catch (e) {
-            setError('Failed to save routine');
+            setError(t('automations.failedToSave'));
         } finally {
             setIsSaving(false);
         }
@@ -290,11 +308,11 @@ export function AutomationDetailModal({
                 onDeleted();
             } else {
                 const data = await res.json();
-                setError(typeof data.error === 'string' ? data.error : 'Failed to delete routine');
+                setError(typeof data.error === 'string' ? data.error : t('automations.failedToDelete'));
                 setShowDeleteConfirm(false);
             }
         } catch (e) {
-            setError('Failed to delete routine');
+            setError(t('automations.failedToDelete'));
             setShowDeleteConfirm(false);
         } finally {
             setIsDeleting(false);
@@ -333,7 +351,7 @@ export function AutomationDetailModal({
                         {pendingConfirmation ? (
                             <span className="automation-status-badge awaiting-confirmation">
                                 <AlertCircle size={10} />
-                                needs approval
+                                {t('automations.needsApproval')}
                             </span>
                         ) : (
                             <span className={`automation-status-badge ${automation.status}`}>
@@ -352,7 +370,7 @@ export function AutomationDetailModal({
                         <div className="automation-confirmation-section">
                             <div className="confirmation-header">
                                 <AlertCircle size={16} />
-                                <h3>Action Required</h3>
+                                <h3>{t('automations.actionRequired')}</h3>
                             </div>
                             <div className="confirmation-content">
                                 <p className="confirmation-title">{pendingConfirmation.request.title}</p>
@@ -366,10 +384,10 @@ export function AutomationDetailModal({
                                             {commandInfo?.command && (
                                                 <div className="confirmation-command-section">
                                                     <div className="confirmation-command-header">
-                                                        <span className="confirmation-command-label">Command</span>
+                                                        <span className="confirmation-command-label">{t('automations.command')}</span>
                                                         {commandInfo.workdir && (
                                                             <code className="confirmation-workdir">
-                                                                in {shortenHomePath(commandInfo.workdir)}
+                                                                {t('automations.in')} {shortenHomePath(commandInfo.workdir)}
                                                             </code>
                                                         )}
                                                     </div>
@@ -392,7 +410,7 @@ export function AutomationDetailModal({
                                 <div className="confirmation-guidance-section">
                                     <textarea
                                         className="confirmation-guidance-input"
-                                        placeholder="Provide guidance for a different approach..."
+                                        placeholder={t('automations.guidancePlaceholder')}
                                         value={guidanceText}
                                         onChange={(e) => setGuidanceText(e.target.value)}
                                         autoFocus
@@ -406,7 +424,7 @@ export function AutomationDetailModal({
                                                 setGuidanceText('');
                                             }}
                                         >
-                                            Cancel
+                                            {t('common.cancel')}
                                         </button>
                                         <button
                                             className="btn-confirmation primary"
@@ -414,7 +432,7 @@ export function AutomationDetailModal({
                                             disabled={!guidanceText.trim()}
                                         >
                                             <Send size={14} />
-                                            Send Guidance
+                                            {t('automations.sendGuidance')}
                                         </button>
                                     </div>
                                 </div>
@@ -445,27 +463,27 @@ export function AutomationDetailModal({
                         // View mode
                         <>
                             <div className="automation-detail-section">
-                                <h3>Instructions</h3>
+                                <h3>{t('automations.instructions')}</h3>
                                 <p className="automation-detail-instructions">{automation.prompt}</p>
                             </div>
 
                             <div className="automation-detail-section">
-                                <h3>Schedule</h3>
+                                <h3>{t('automations.schedule')}</h3>
                                 <div className="automation-detail-schedule">
                                     <Calendar size={16} />
-                                    <span>{formatSchedule(automation)}</span>
+                                    <span>{formatSchedule(automation, t)}</span>
                                 </div>
                                 {hasSchedule && automation.nextScheduledAt && isActive && !pendingConfirmation && (
                                     <div className="automation-detail-next-run">
                                         <Clock size={14} />
-                                        <span>Next run: {new Date(automation.nextScheduledAt).toLocaleString()}</span>
+                                        <span>{t('automations.nextRun', { time: new Date(automation.nextScheduledAt).toLocaleString() })}</span>
                                     </div>
                                 )}
                             </div>
 
                             {automation.lastExecutedAt && (
                                 <div className="automation-detail-section">
-                                    <h3>Last Run</h3>
+                                    <h3>{t('automations.lastRun')}</h3>
                                     <p className="automation-detail-meta">
                                         {new Date(automation.lastExecutedAt).toLocaleString()}
                                     </p>
@@ -476,7 +494,7 @@ export function AutomationDetailModal({
                         // Edit mode
                         <>
                             <div className="automation-detail-section">
-                                <h3>Name</h3>
+                                <h3>{t('automations.name')}</h3>
                                 <input
                                     type="text"
                                     value={name}
@@ -487,7 +505,7 @@ export function AutomationDetailModal({
                             </div>
 
                             <div className="automation-detail-section">
-                                <h3>Instructions</h3>
+                                <h3>{t('automations.instructions')}</h3>
                                 <textarea
                                     value={instructions}
                                     onChange={(e) => setInstructions(e.target.value)}
@@ -504,9 +522,9 @@ export function AutomationDetailModal({
                                     onClick={() => setEditHasSchedule(!editHasSchedule)}
                                 >
                                     {editHasSchedule ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                    <span>Schedule</span>
+                                    <span>{t('automations.schedule')}</span>
                                     <span className="schedule-toggle-hint">
-                                        {editHasSchedule ? '' : '(Optional - run on a recurring schedule)'}
+                                        {editHasSchedule ? '' : t('automations.scheduleHintInline')}
                                     </span>
                                 </button>
 
@@ -515,7 +533,7 @@ export function AutomationDetailModal({
                                         <div className="frequency-selector">
                                             <div className="frequency-row">
                                                 <Calendar size={16} className="frequency-icon" />
-                                                <span className="frequency-label">Every</span>
+                                                <span className="frequency-label">{t('automations.every')}</span>
                                                 <select
                                                     value={frequency}
                                                     onChange={(e) => setFrequency(e.target.value as FrequencyType)}
@@ -530,10 +548,10 @@ export function AutomationDetailModal({
                                             {/* Day of Week selector for weekly */}
                                             {frequency === 'week' && (
                                                 <div className="frequency-detail">
-                                                    <p className="frequency-detail-label">Every week, on which day should the routine run?</p>
+                                                    <p className="frequency-detail-label">{t('automations.weekDayPromptDetail')}</p>
                                                     <div className="frequency-row">
                                                         <Calendar size={16} className="frequency-icon" />
-                                                        <span className="frequency-label">On</span>
+                                                        <span className="frequency-label">{t('automations.on')}</span>
                                                         <select
                                                             value={dayOfWeek}
                                                             onChange={(e) => setDayOfWeek(e.target.value as DayOfWeek)}
@@ -550,10 +568,10 @@ export function AutomationDetailModal({
                                             {/* Day of Month selector for monthly */}
                                             {frequency === 'month' && (
                                                 <div className="frequency-detail">
-                                                    <p className="frequency-detail-label">Every month, on which day should the routine run?</p>
+                                                    <p className="frequency-detail-label">{t('automations.monthDayPromptDetail')}</p>
                                                     <div className="frequency-row">
                                                         <Calendar size={16} className="frequency-icon" />
-                                                        <span className="frequency-label">On the</span>
+                                                        {onTheLabel ? <span className="frequency-label">{onTheLabel}</span> : null}
                                                         <select
                                                             value={dayOfMonth}
                                                             onChange={(e) => setDayOfMonth(Number(e.target.value))}
@@ -570,10 +588,10 @@ export function AutomationDetailModal({
                                             {/* Minute selector for hourly */}
                                             {frequency === 'hour' && (
                                                 <div className="frequency-detail">
-                                                    <p className="frequency-detail-label">Every hour, at which minute should the routine run?</p>
+                                                    <p className="frequency-detail-label">{t('automations.minutePromptDetail')}</p>
                                                     <div className="frequency-row">
                                                         <Clock size={16} className="frequency-icon" />
-                                                        <span className="frequency-label">At minute</span>
+                                                        <span className="frequency-label">{t('automations.atMinute')}</span>
                                                         <select
                                                             value={minuteOfHour}
                                                             onChange={(e) => setMinuteOfHour(Number(e.target.value))}
@@ -591,10 +609,10 @@ export function AutomationDetailModal({
                                         {/* Time Section - only show for non-hourly frequencies */}
                                         {frequency !== 'hour' && (
                                             <div className="time-selector">
-                                                <p className="frequency-detail-label">At what time should the routine run?</p>
+                                                <p className="frequency-detail-label">{t('automations.timePromptDetail')}</p>
                                                 <div className="frequency-row">
                                                     <Clock size={16} className="frequency-icon" />
-                                                    <span className="frequency-label">At</span>
+                                                    {atLabel ? <span className="frequency-label">{atLabel}</span> : null}
                                                     <select
                                                         value={time}
                                                         onChange={(e) => setTime(e.target.value)}
@@ -619,14 +637,14 @@ export function AutomationDetailModal({
                 <div className="modal-actions automation-detail-actions">
                     {showDeleteConfirm ? (
                         <>
-                            <span className="delete-confirm-text">Delete this routine?</span>
+                            <span className="delete-confirm-text">{t('automations.deleteRoutineConfirm')}</span>
                             <button
                                 type="button"
                                 onClick={() => setShowDeleteConfirm(false)}
                                 className="btn-secondary"
                                 disabled={isDeleting}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 type="button"
@@ -637,12 +655,12 @@ export function AutomationDetailModal({
                                 {isDeleting ? (
                                     <>
                                         <Loader2 size={16} className="spinning" />
-                                        <span>Deleting...</span>
+                                        <span>{t('automations.deleting')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Trash2 size={16} />
-                                        <span>Delete</span>
+                                        <span>{t('common.delete')}</span>
                                     </>
                                 )}
                             </button>
@@ -663,7 +681,7 @@ export function AutomationDetailModal({
                                 className="btn-secondary"
                                 disabled={isSaving}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 type="button"
@@ -674,12 +692,12 @@ export function AutomationDetailModal({
                                 {isSaving ? (
                                     <>
                                         <Loader2 size={16} className="spinning" />
-                                        <span>Saving...</span>
+                                        <span>{t('automations.saving')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Save size={16} />
-                                        <span>Save</span>
+                                        <span>{t('automations.save')}</span>
                                     </>
                                 )}
                             </button>
@@ -701,7 +719,7 @@ export function AutomationDetailModal({
                                     className="btn-secondary"
                                 >
                                     <MessageSquare size={16} />
-                                    <span>View</span>
+                                    <span>{t('automations.view')}</span>
                                 </button>
                             )}
                             <button
@@ -715,12 +733,12 @@ export function AutomationDetailModal({
                                 ) : isActive ? (
                                     <>
                                         <Pause size={16} />
-                                        <span>Pause</span>
+                                        <span>{t('automations.pause')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Play size={16} />
-                                        <span>Resume</span>
+                                        <span>{t('automations.resume')}</span>
                                     </>
                                 )}
                             </button>
@@ -730,24 +748,24 @@ export function AutomationDetailModal({
                                 className="btn-secondary"
                             >
                                 <Pencil size={16} />
-                                <span>Edit</span>
+                                <span>{t('automations.edit')}</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={handleTrigger}
                                 className="btn-primary btn-run-now"
                                 disabled={isTriggering || pendingConfirmation !== undefined}
-                                title={pendingConfirmation ? 'Resolve pending confirmation first' : 'Run routine now'}
+                                title={pendingConfirmation ? t('automations.resolveConfirmationFirst') : t('automations.runRoutineNow')}
                             >
                                 {isTriggering ? (
                                     <>
                                         <Loader2 size={16} className="spinning" />
-                                        <span>Running...</span>
+                                        <span>{t('automations.running')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Zap size={16} />
-                                        <span>Run Now</span>
+                                        <span>{t('automations.runNow')}</span>
                                     </>
                                 )}
                             </button>

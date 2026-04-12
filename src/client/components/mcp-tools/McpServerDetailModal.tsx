@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2, Trash2, Save, Play, Terminal, Globe, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import type { McpServerInfo, McpTransportType, McpConfirmationMode, McpToolInfo, UpdateMcpServerInput } from '../../types/mcp';
 import { apiFetch } from '../../utils/api';
+import { useTranslation } from 'react-i18next';
 
 interface McpServerDetailModalProps {
     server: McpServerInfo;
@@ -24,6 +25,8 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
     const [enabledToolsSet, setEnabledToolsSet] = useState<Set<string>>(() => {
         return new Set(server.enabledTools || []);
     });
+
+    const { t } = useTranslation();
 
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -144,10 +147,10 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                 onClose();
             } else {
                 const data = await res.json();
-                setError(data.error || 'Failed to update server');
+                setError(data.error || t('mcpTools.failedToUpdateServer'));
             }
         } catch (e) {
-            setError('Failed to update server');
+            setError(t('mcpTools.failedToUpdateServer'));
         } finally {
             setIsSaving(false);
         }
@@ -166,10 +169,10 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                 onDeleted();
             } else {
                 const data = await res.json();
-                setError(data.error || 'Failed to delete server');
+                setError(data.error || t('mcpTools.failedToDeleteServer'));
             }
         } catch (e) {
-            setError('Failed to delete server');
+            setError(t('mcpTools.failedToDeleteServer'));
         } finally {
             setIsDeleting(false);
             setShowDeleteConfirm(false);
@@ -192,20 +195,20 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
             if (data.success) {
                 setTestResult({
                     success: true,
-                    message: `Connection successful! Found ${data.toolCount} tool(s).`,
+                    message: t('mcpTools.connectionSuccessful', { count: data.toolCount }),
                 });
                 // Also load tools
                 await loadTools();
             } else {
                 setTestResult({
                     success: false,
-                    message: data.error || 'Connection failed',
+                    message: data.error || t('mcpTools.connectionFailed'),
                 });
             }
         } catch (e) {
             setTestResult({
                 success: false,
-                message: 'Failed to test connection',
+                message: t('mcpTools.failedToTestConnection'),
             });
         } finally {
             setIsTesting(false);
@@ -246,18 +249,18 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                 <div className="mcp-server-detail-content">
                     <div className="mcp-server-form">
                         <div className="form-group">
-                            <label htmlFor="server-description">Description</label>
+                            <label htmlFor="server-description">{t('mcpTools.description')}</label>
                             <input
                                 id="server-description"
                                 type="text"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                placeholder="What this server provides"
+                                placeholder={t('mcpTools.descriptionDetailPlaceholder')}
                             />
                         </div>
 
                         <div className="form-group">
-                            <label>Transport Type</label>
+                            <label>{t('mcpTools.transportType')}</label>
                             <div className="transport-type-selector compact">
                                 <button
                                     type="button"
@@ -265,7 +268,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                     onClick={() => setTransportType('stdio')}
                                 >
                                     <Terminal size={16} />
-                                    <span>stdio</span>
+                                    <span>{t('mcpTools.stdio')}</span>
                                 </button>
                                 <button
                                     type="button"
@@ -273,14 +276,14 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                     onClick={() => setTransportType('sse')}
                                 >
                                     <Globe size={16} />
-                                    <span>HTTP/SSE</span>
+                                    <span>{t('mcpTools.httpSse')}</span>
                                 </button>
                             </div>
                         </div>
 
                         <div className="form-group">
                             <label htmlFor="server-path">
-                                {transportType === 'stdio' ? 'Command / Package' : 'Server URL'}
+                                {transportType === 'stdio' ? t('mcpTools.commandLabel') : t('mcpTools.serverUrlLabel')}
                             </label>
                             <input
                                 id="server-path"
@@ -292,20 +295,20 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
 
                         {transportType === 'sse' && (
                             <div className="form-group">
-                                <label htmlFor="server-api-key">API Key</label>
+                                <label htmlFor="server-api-key">{t('mcpTools.apiKey')}</label>
                                 <input
                                     id="server-api-key"
                                     type="password"
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
-                                    placeholder="Optional authentication key"
+                                    placeholder={t('mcpTools.apiKeyPlaceholder')}
                                 />
                             </div>
                         )}
 
                         {transportType === 'stdio' && (
                             <div className="form-group">
-                                <label>Environment Variables</label>
+                                <label>{t('mcpTools.envVars')}</label>
                                 <div className="env-vars-list">
                                     {envVars.map((envVar, index) => (
                                         <div key={index} className="env-var-row">
@@ -313,7 +316,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                                 type="text"
                                                 value={envVar.key}
                                                 onChange={(e) => handleEnvVarChange(index, 'key', e.target.value)}
-                                                placeholder="KEY"
+                                                placeholder={t('mcpTools.envKeyPlaceholder')}
                                                 className="env-var-key"
                                             />
                                             <span className="env-var-separator">=</span>
@@ -321,7 +324,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                                 type="text"
                                                 value={envVar.value}
                                                 onChange={(e) => handleEnvVarChange(index, 'value', e.target.value)}
-                                                placeholder="value"
+                                                placeholder={t('mcpTools.envValuePlaceholder')}
                                                 className="env-var-value"
                                             />
                                             <button
@@ -339,46 +342,46 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                         className="btn-text add-env-var-btn"
                                     >
                                         <Plus size={14} />
-                                        <span>Add variable</span>
+                                        <span>{t('mcpTools.addVariable')}</span>
                                     </button>
                                 </div>
                             </div>
                         )}
 
                         <div className="form-group">
-                            <label htmlFor="confirmation-mode">Confirmation Mode</label>
+                            <label htmlFor="confirmation-mode">{t('mcpTools.confirmationMode')}</label>
                             <div className="confirmation-mode-selector">
                                 <button
                                     type="button"
                                     className={`confirmation-mode-btn ${confirmationMode === 'always' ? 'active' : ''}`}
                                     onClick={() => setConfirmationMode('always')}
                                 >
-                                    Always
+                                    {t('mcpTools.confirmAlwaysShort')}
                                 </button>
                                 <button
                                     type="button"
                                     className={`confirmation-mode-btn ${confirmationMode === 'unsafe_only' ? 'active' : ''}`}
                                     onClick={() => setConfirmationMode('unsafe_only')}
                                 >
-                                    Unsafe Only
+                                    {t('mcpTools.confirmUnsafeShort')}
                                 </button>
                                 <button
                                     type="button"
                                     className={`confirmation-mode-btn ${confirmationMode === 'never' ? 'active' : ''}`}
                                     onClick={() => setConfirmationMode('never')}
                                 >
-                                    Never
+                                    {t('mcpTools.confirmNeverShort')}
                                 </button>
                             </div>
                             <span className="form-hint">
-                                {confirmationMode === 'always' && 'Every action requires your approval'}
-                                {confirmationMode === 'unsafe_only' && 'Only actions with lasting side effects need your approval. E.g., submit, send, delete, not search or read.'}
-                                {confirmationMode === 'never' && 'All actions are auto approved'}
+                                {confirmationMode === 'always' && t('mcpTools.confirmAlwaysHint')}
+                                {confirmationMode === 'unsafe_only' && t('mcpTools.confirmUnsafeHintLong')}
+                                {confirmationMode === 'never' && t('mcpTools.confirmNeverHintShort')}
                             </span>
                         </div>
 
                         <div className="form-group form-toggle-group">
-                            <label htmlFor="server-enabled">Enable Server</label>
+                            <label htmlFor="server-enabled">{t('mcpTools.enableServerLong')}</label>
                             <label className="toggle-switch">
                                 <input
                                     id="server-enabled"
@@ -401,12 +404,12 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                 {isTesting ? (
                                     <>
                                         <Loader2 size={16} className="spinning" />
-                                        <span>Testing...</span>
+                                        <span>{t('mcpTools.testing')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Play size={16} />
-                                        <span>Test Connection</span>
+                                        <span>{t('mcpTools.testConnection')}</span>
                                     </>
                                 )}
                             </button>
@@ -427,7 +430,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                         {tools.length > 0 && (
                             <div className="mcp-tools-list">
                                 <div className="mcp-tools-list-header">
-                                    <h4>Available Tools ({tools.length})</h4>
+                                    <h4>{t('mcpTools.availableTools', { count: tools.length })}</h4>
                                     <div className="mcp-tools-list-actions">
                                         <button
                                             type="button"
@@ -435,7 +438,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                             className="btn-text-sm"
                                             disabled={enabledToolsSet.size === tools.length}
                                         >
-                                            Enable All
+                                            {t('mcpTools.enableAll')}
                                         </button>
                                         <span className="divider">|</span>
                                         <button
@@ -444,14 +447,14 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                             className="btn-text-sm"
                                             disabled={enabledToolsSet.size === 0}
                                         >
-                                            Disable All
+                                            {t('mcpTools.disableAll')}
                                         </button>
                                     </div>
                                 </div>
                                 <p className="mcp-tools-help">
                                     {enabledToolsSet.size === 0
-                                        ? 'All tools are enabled by default. Toggle individual tools to restrict access.'
-                                        : `${enabledToolsSet.size} of ${tools.length} tools enabled.`}
+                                        ? t('mcpTools.allToolsEnabled')
+                                        : t('mcpTools.toolsEnabledCount', { enabled: enabledToolsSet.size, total: tools.length })}
                                 </p>
                                 <div className="tools-list">
                                     {tools.map((tool) => {
@@ -480,7 +483,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                         {isLoadingTools && (
                             <div className="mcp-tools-loading">
                                 <Loader2 size={16} className="spinning" />
-                                <span>Loading tools...</span>
+                                <span>{t('mcpTools.loadingTools')}</span>
                             </div>
                         )}
 
@@ -492,7 +495,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                     <div className="modal-actions-left">
                         {showDeleteConfirm ? (
                             <>
-                                <span className="delete-confirm-text">Delete this server?</span>
+                                <span className="delete-confirm-text">{t('mcpTools.deleteServerConfirm')}</span>
                                 <button
                                     type="button"
                                     onClick={handleDelete}
@@ -502,7 +505,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                     {isDeleting ? (
                                         <Loader2 size={16} className="spinning" />
                                     ) : (
-                                        'Yes, Delete'
+                                        t('mcpTools.yesDelete')
                                     )}
                                 </button>
                                 <button
@@ -510,7 +513,7 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                     onClick={() => setShowDeleteConfirm(false)}
                                     className="btn-secondary"
                                 >
-                                    Cancel
+                                    {t('common.cancel')}
                                 </button>
                             </>
                         ) : (
@@ -520,13 +523,13 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                 className="btn-danger-outline"
                             >
                                 <Trash2 size={16} />
-                                <span>Delete</span>
+                                <span>{t('common.delete')}</span>
                             </button>
                         )}
                     </div>
                     <div className="modal-actions-right">
                         <button type="button" onClick={onClose} className="btn-secondary">
-                            Close
+                            {t('common.close')}
                         </button>
                         <button
                             type="button"
@@ -537,12 +540,12 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                             {isSaving ? (
                                 <>
                                     <Loader2 size={16} className="spinning" />
-                                    <span>Saving...</span>
+                                    <span>{t('mcpTools.savingShort')}</span>
                                 </>
                             ) : (
                                 <>
                                     <Save size={16} />
-                                    <span>Save Changes</span>
+                                    <span>{t('mcpTools.saveChanges')}</span>
                                 </>
                             )}
                         </button>

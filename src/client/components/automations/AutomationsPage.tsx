@@ -1,6 +1,7 @@
 // Main automations page component
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Plus } from 'lucide-react';
 import type { AutomationInfo, AutomationPendingConfirmation } from '../../types/automations';
 import { AutomationCard } from './AutomationCard';
@@ -24,6 +25,7 @@ export function AutomationsPage({
     onViewConversation,
     onAutomationChanged,
 }: AutomationsPageProps) {
+    const { t } = useTranslation();
     const [automations, setAutomations] = useState<AutomationInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -85,7 +87,7 @@ export function AutomationsPage({
             <main className="main-content">
                 <div className="messages-container">
                     <div className="automations-gallery">
-                        <div className="automations-loading">Loading routines...</div>
+                        <div className="automations-loading">{t('automations.loading')}</div>
                     </div>
                 </div>
             </main>
@@ -98,7 +100,7 @@ export function AutomationsPage({
                 <div className="automations-gallery">
                     <div className="automations-header">
                         <div className="automations-header-left">
-                            <h2>Routines</h2>
+                            <h2>{t('automations.title')}</h2>
                             <span className="automations-count">{automations.length}</span>
                         </div>
                         <div className="automations-header-actions">
@@ -107,13 +109,13 @@ export function AutomationsPage({
                                 className="automations-create-btn"
                             >
                                 <Plus size={16} />
-                                <span>Create</span>
+                                <span>{t('common.create')}</span>
                             </button>
                             <button
                                 onClick={handleRefresh}
                                 disabled={isRefreshing}
                                 className="automations-reload-btn"
-                                title="Refresh routines"
+                                title={t('automations.refreshTooltip')}
                             >
                                 <RefreshCw size={16} className={isRefreshing ? 'spinning' : ''} />
                             </button>

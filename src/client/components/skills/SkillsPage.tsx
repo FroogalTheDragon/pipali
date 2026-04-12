@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Plus, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { SkillInfo, SkillLoadError } from '../../types/skills';
 import { SkillCard } from './SkillCard';
 import { SkillsEmpty } from './SkillsEmpty';
@@ -10,6 +11,7 @@ import { SkillDetailModal } from './SkillDetailModal';
 import { apiFetch } from '../../utils/api';
 
 export function SkillsPage() {
+    const { t } = useTranslation();
     const [skills, setSkills] = useState<SkillInfo[]>([]);
     const [errors, setErrors] = useState<SkillLoadError[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -83,7 +85,7 @@ export function SkillsPage() {
             <main className="main-content">
                 <div className="messages-container">
                     <div className="skills-gallery">
-                        <div className="skills-loading">Loading skills...</div>
+                        <div className="skills-loading">{t('skills.loading')}</div>
                     </div>
                 </div>
             </main>
@@ -96,7 +98,7 @@ export function SkillsPage() {
                 <div className="skills-gallery">
                     <div className="skills-header">
                         <div className="skills-header-left">
-                            <h2>Skills</h2>
+                            <h2>{t('skills.title')}</h2>
                             <span className="skills-count">{skills.length}</span>
                         </div>
                         <div className="skills-header-actions">
@@ -105,13 +107,13 @@ export function SkillsPage() {
                                 className="skills-create-btn"
                             >
                                 <Plus size={16} />
-                                <span>Create</span>
+                                <span>{t('common.create')}</span>
                             </button>
                             <button
                                 onClick={handleReload}
                                 disabled={isReloading}
                                 className="skills-reload-btn"
-                                title="Reload skills from disk"
+                                title={t('skills.reloadTooltip')}
                             >
                                 <RefreshCw size={16} className={isReloading ? 'spinning' : ''} />
                             </button>

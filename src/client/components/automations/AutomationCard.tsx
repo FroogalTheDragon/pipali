@@ -1,6 +1,9 @@
 // Individual automation card for automations page gallery
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import i18n from '../../i18n';
 import { ChevronRight, Clock, Calendar, AlertCircle } from 'lucide-react';
 import type { AutomationInfo, AutomationPendingConfirmation } from '../../types/automations';
 
@@ -11,17 +14,17 @@ interface AutomationCardProps {
 }
 
 // Parse cron schedule to human-readable format
-function formatSchedule(automation: AutomationInfo): string {
+function formatSchedule(automation: AutomationInfo, t: TFunction): string {
     if (!automation.triggerType || !automation.triggerConfig) {
-        return 'Manual only';
+        return t('automations.manualOnly');
     }
 
     if (automation.triggerType !== 'cron') {
-        return 'File watch trigger';
+        return t('automations.fileWatchTrigger');
     }
 
     const config = automation.triggerConfig;
-    if (config.type !== 'cron') return 'Unknown schedule';
+    if (config.type !== 'cron') return t('automations.unknownSchedule');
 
     const parts = config.schedule.split(' ');
     if (parts.length !== 5) return config.schedule;
@@ -32,76 +35,90 @@ function formatSchedule(automation: AutomationInfo): string {
     const dayOfWeek = parts[4] ?? '*';
 
     const hourNum = parseInt(hour, 10);
-    const hour12 = hourNum % 12 || 12;
-    const period = hourNum < 12 ? 'AM' : 'PM';
-    const timeStr = `${hour12}:${minute.padStart(2, '0')} ${period}`;
+    const formatTime = (h: number, m: string) => {
+        const am = t('automations.timePeriodAM');
+        const pm = t('automations.timePeriodPM');
+        // If locale has no AM/PM strings, use 24-hour format
+        if (!am && !pm) return `${h.toString().padStart(2, '0')}:${m.padStart(2, '0')}`;
+        const h12 = h % 12 || 12;
+        return `${h12}:${m.padStart(2, '0')} ${h < 12 ? am : pm}`;
+    };
+    const timeStr = formatTime(hourNum, minute);
 
     // Hourly
     if (hour === '*') {
-        const suffix = ['th', 'st', 'nd', 'rd'];
-        const minuteNum = parseInt(minute, 10);
-        const s = suffix[(minuteNum % 10 <= 3 && Math.floor(minuteNum / 10) !== 1) ? minuteNum % 10 : 0];
-        return `Hourly at ${minuteNum}${s} minute`;
+        return t('automations.hourlyAt', { minute: minute.padStart(2, '0') });
     }
 
     // Daily
     if (dayOfMonth === '*' && dayOfWeek === '*') {
-        return `Daily at ${timeStr}`;
+        return t('automations.dailyAt', { time: timeStr });
     }
 
     // Weekly
     if (dayOfMonth === '*' && dayOfWeek !== '*') {
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const dayName = days[parseInt(dayOfWeek, 10)] ?? dayOfWeek;
-        return `Weekly on ${dayName} at ${timeStr}`;
+        const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayKey = dayKeys[parseInt(dayOfWeek, 10)] ?? 'sunday';
+        const dayName = t(`automations.days.${dayKey}`);
+        return t('automations.weeklyOn', { day: dayName, time: timeStr });
     }
 
     // Monthly
     if (dayOfMonth !== '*') {
-        const suffix = ['th', 'st', 'nd', 'rd'];
         const dom = parseInt(dayOfMonth, 10);
-        const s = suffix[(dom % 10 <= 3 && Math.floor(dom / 10) !== 1) ? dom % 10 : 0];
-        return `Monthly on ${dom}${s} at ${timeStr}`;
+        let dayStr = `${dom}`;
+        if (i18n.language.startsWith('en')) {
+            const suffixes = ['th', 'st', 'nd', 'rd'];
+            const v = dom % 100;
+            dayStr = `${dom}${suffixes[(v >= 11 && v <= 13) ? 0 : Math.min(v % 10, 4) > 3 ? 0 : v % 10]}`;
+        }
+        return t('automations.monthlyOn', { day: dayStr, time: timeStr });
     }
 
     return config.schedule;
 }
 
 // Format next scheduled time
-function formatNextRun(nextScheduledAt?: string): string | null {
+function formatNextRun(nextScheduledAt: string | undefined, t: TFunction): string | null {
     if (!nextScheduledAt) return null;
 
     const next = new Date(nextScheduledAt);
     const now = new Date();
     const diffMs = next.getTime() - now.getTime();
 
-    if (diffMs < 0) return 'Overdue';
+    if (diffMs < 0) return t('automations.overdue');
 
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffDays > 0) {
-        return `in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+        return t('automations.inDays', { count: diffDays });
     }
     if (diffHours > 0) {
-        return `in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+        return t('automations.inHours', { count: diffHours });
     }
 
     const diffMinutes = Math.floor(diffMs / (1000 * 60));
     if (diffMinutes > 0) {
-        return `in ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+        return t('automations.inMinutes', { count: diffMinutes });
     }
 
-    return 'soon';
+    return t('automations.soon');
 }
 
+const STATUS_KEYS: Record<string, string> = {
+    active: 'automations.statusActive',
+    paused: 'automations.statusPaused',
+};
+
 export function AutomationCard({ automation, pendingConfirmation, onClick }: AutomationCardProps) {
+    const { t } = useTranslation();
     const isActive = automation.status === 'active';
     const isPaused = automation.status === 'paused';
     const hasConfirmation = !!pendingConfirmation;
     const hasSchedule = automation.triggerType && automation.triggerConfig;
-    const schedule = formatSchedule(automation);
-    const nextRun = hasSchedule ? formatNextRun(automation.nextScheduledAt) : null;
+    const schedule = formatSchedule(automation, t);
+    const nextRun = hasSchedule ? formatNextRun(automation.nextScheduledAt, t) : null;
 
     // Determine card classes
     const cardClasses = [
@@ -127,11 +144,11 @@ export function AutomationCard({ automation, pendingConfirmation, onClick }: Aut
                 {hasConfirmation ? (
                     <div className="automation-status-badge awaiting-confirmation">
                         <AlertCircle size={10} />
-                        needs approval
+                        {t('automations.needsApproval')}
                     </div>
                 ) : (
                     <div className={`automation-status-badge ${automation.status}`}>
-                        {automation.status}
+                        {t(STATUS_KEYS[automation.status] ?? 'automations.statusActive', { defaultValue: automation.status })}
                     </div>
                 )}
             </div>
@@ -152,7 +169,7 @@ export function AutomationCard({ automation, pendingConfirmation, onClick }: Aut
                 {nextRun && isActive && !hasConfirmation && (
                     <div className="automation-next-run">
                         <Clock size={12} />
-                        <span>Next: {nextRun}</span>
+                        <span>{t('automations.next')} {nextRun}</span>
                     </div>
                 )}
                 <ChevronRight size={14} className="automation-chevron" />

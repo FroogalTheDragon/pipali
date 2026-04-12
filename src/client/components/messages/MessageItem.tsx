@@ -1,6 +1,7 @@
 // Individual message component
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -23,6 +24,7 @@ interface MessageItemProps {
 }
 
 export function MessageItem({ message, platformFrontendUrl, onDelete, onBillingContinue, onBillingDismiss }: MessageItemProps) {
+    const { t } = useTranslation();
     const isUser = message.role === 'user';
     const [isHovered, setIsHovered] = useState(false);
 
@@ -54,7 +56,7 @@ export function MessageItem({ message, platformFrontendUrl, onDelete, onBillingC
                     <button
                         className="message-action-btn"
                         onClick={() => onDelete(message.id, message.role)}
-                        title="Delete message"
+                        title={t('messages.deleteMessage')}
                     >
                         <Trash2 size={14} />
                     </button>

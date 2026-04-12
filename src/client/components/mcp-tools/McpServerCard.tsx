@@ -1,4 +1,5 @@
 import { Terminal, Globe, CheckCircle, XCircle, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { McpServerInfo, McpConnectionStatus } from '../../types/mcp';
 
 interface McpServerCardProps {
@@ -25,12 +26,23 @@ function getStatusIcon(status: McpConnectionStatus | undefined, enabled: boolean
 
 function getStatusText(status: McpConnectionStatus | undefined, enabled: boolean): string {
     if (!enabled) return 'disabled';
-    return status || 'disconnected';
+    return status ?? 'disconnected';
 }
 
+const STATUS_KEYS: Record<string, string> = {
+    disabled: 'mcpTools.statusDisabled',
+    disconnected: 'mcpTools.statusDisconnected',
+    connected: 'mcpTools.statusConnected',
+    connecting: 'mcpTools.statusConnecting',
+    error: 'mcpTools.statusError',
+};
+
 export function McpServerCard({ server, onClick }: McpServerCardProps) {
+    const { t } = useTranslation();
     const TransportIcon = server.transportType === 'stdio' ? Terminal : Globe;
     const status = server.connectionStatus;
+    const statusText = getStatusText(status, server.enabled);
+    const statusLabel = t((STATUS_KEYS[statusText] ?? 'mcpTools.statusDisconnected') as any) as string;
 
     return (
         <div
@@ -50,9 +62,9 @@ export function McpServerCard({ server, onClick }: McpServerCardProps) {
                     <TransportIcon size={12} />
                     <span>{server.transportType}</span>
                 </div>
-                <div className={`mcp-server-status-badge ${getStatusText(status, server.enabled)}`}>
+                <div className={`mcp-server-status-badge ${statusText}`}>
                     {getStatusIcon(status, server.enabled)}
-                    <span>{getStatusText(status, server.enabled)}</span>
+                    <span>{statusLabel}</span>
                 </div>
             </div>
 
@@ -78,10 +90,10 @@ export function McpServerCard({ server, onClick }: McpServerCardProps) {
                     {server.confirmationMode !== 'never' && (
                         <span className="mcp-server-confirmation-badge" title={
                             server.confirmationMode === 'always'
-                                ? 'Confirmation required for all operations'
-                                : 'Confirmation required for write operations'
+                                ? t('mcpTools.confirmAllTooltip')
+                                : t('mcpTools.confirmWritesTooltip')
                         }>
-                            {server.confirmationMode === 'always' ? 'Confirm all' : 'Confirm writes'}
+                            {server.confirmationMode === 'always' ? t('mcpTools.confirmAllBadge') : t('mcpTools.confirmWritesBadge')}
                         </span>
                     )}
                 </div>

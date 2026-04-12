@@ -1,5 +1,6 @@
 // Billing message component for chat thread display
 
+import { useTranslation } from 'react-i18next';
 import { CreditCard, AlertTriangle, ExternalLink as ExternalLinkIcon, X } from 'lucide-react';
 import type { BillingAlertCode } from '../../types/billing';
 import { getBillingActionLabel, getBillingTitle } from './billing-messages';
@@ -18,6 +19,7 @@ interface BillingMessageProps {
  * Shows a friendly message with a CTA to resolve the billing issue.
  */
 export function BillingMessage({ code, message, platformFrontendUrl, onContinue, onDismiss }: BillingMessageProps) {
+    const { t } = useTranslation();
     const billingUrl = `${platformFrontendUrl}/dashboard/billing`;
     const isCreditsError = code === 'insufficient_credits';
     const title = getBillingTitle(code);
@@ -31,7 +33,7 @@ export function BillingMessage({ code, message, platformFrontendUrl, onContinue,
                 </span>
                 <span className="billing-message-title">{title}</span>
                 {onDismiss && (
-                    <button className="billing-message-dismiss" onClick={onDismiss} title="Dismiss">
+                    <button className="billing-message-dismiss" onClick={onDismiss} title={t('common.dismiss')}>
                         <X size={16} />
                     </button>
                 )}
@@ -47,7 +49,7 @@ export function BillingMessage({ code, message, platformFrontendUrl, onContinue,
                 </ExternalLink>
                 {onContinue && (
                     <button className="billing-message-continue" onClick={onContinue}>
-                        Done, Continue
+                        {t('billing.doneContinue')}
                     </button>
                 )}
             </div>

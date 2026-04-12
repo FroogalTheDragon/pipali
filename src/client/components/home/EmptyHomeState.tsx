@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { RibbonAnimation } from './RibbonAnimation';
+import i18n from '../../i18n';
 
 type TimeSlot = 'lateNight' | 'earlyMorning' | 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -32,93 +33,55 @@ function isMonday(day: number): boolean {
     return day === 1;
 }
 
+export function formatGreetingName(name?: string, language = i18n.resolvedLanguage ?? i18n.language): string {
+    const trimmed = name?.trim();
+    if (!trimmed) return '';
+    return `, ${trimmed}`;
+}
+
 function getGreeting(name?: string): string {
     const now = new Date();
     const hour = now.getHours();
     const dayOfWeek = now.getDay();
-    const n = name ? `, ${name}` : '';
-    const timeOfDay = getTimeOfDay(hour);
+    const n = formatGreetingName(name);
+    const timeOfDay = i18n.t(`home.timeOfDay.${getTimeOfDay(hour)}`);
     const timeSlot = getTimeSlot(hour);
     const weekend = isWeekend(dayOfWeek);
 
     const greetings: string[] = [
-        `Good ${timeOfDay}${n}! What's on your mind?`,
-        `What shall we explore today?`,
-        `What are we working on?`,
-        `Hey${n}! How can I help?`,
-        `What would you like to get done?`,
+        ...(i18n.t('home.greetings.default', { returnObjects: true }) as string[]),
     ];
 
     if (timeSlot === 'lateNight') {
-        greetings.push(
-            `Burning the midnight oil${n}?`,
-            `Still up? Must be something good`,
-            `The quiet hours are the best for deep work`,
-            `Night owl mode activated`,
-            `The world's asleep — let's get things done`,
-        );
+        greetings.push(...(i18n.t('home.greetings.lateNight', { returnObjects: true }) as string[]));
     } else if (timeSlot === 'earlyMorning') {
-        greetings.push(
-            `You're up early${n}! What's the plan?`,
-            `Early bird. The day is all yours`,
-            `Up before the world. What's on your mind?`,
-            `Fresh start to the day. What shall we tackle?`,
-        );
+        greetings.push(...(i18n.t('home.greetings.earlyMorning', { returnObjects: true }) as string[]));
     } else if (timeSlot === 'morning') {
-        greetings.push(
-            `Morning${n}! What shall we tackle?`,
-            `Hey${n}! Ready to get things done?`,
-            `What's the plan for today?`,
-        );
+        greetings.push(...(i18n.t('home.greetings.morning', { returnObjects: true }) as string[]));
         if (isMonday(dayOfWeek)) {
-            greetings.push(
-                `Happy Monday. Let's ease into the week`,
-                `New week, fresh start. What's the priority?`,
-            );
+            greetings.push(...(i18n.t('home.greetings.morningMonday', { returnObjects: true }) as string[]));
         }
     } else if (timeSlot === 'afternoon') {
-        greetings.push(
-            `Afternoon${n}! How can I help?`,
-            `What are you thinking about?`,
-            `What's next on the list?`,
-            `How's the day going?`,
-        );
+        greetings.push(...(i18n.t('home.greetings.afternoon', { returnObjects: true }) as string[]));
     } else if (timeSlot === 'evening') {
-        greetings.push(
-            `Good evening${n}! What's on the agenda?`,
-            `Winding down or gearing up?`,
-            `Evening. What shall we dig into?`,
-        );
+        greetings.push(...(i18n.t('home.greetings.evening', { returnObjects: true }) as string[]));
         if (isFriday(dayOfWeek)) {
-            greetings.push(
-                `Happy Friday${n}! Wrapping up for the week?`,
-                `Friday evening. Almost there!`,
-            );
+            greetings.push(...(i18n.t('home.greetings.eveningFriday', { returnObjects: true }) as string[]));
         }
     } else {
-        greetings.push(
-            `Hey${n}! Working late?`,
-            `Quiet evening. What shall we dig into?`,
-            `Winding down? Or just getting started?`,
-        );
+        greetings.push(...(i18n.t('home.greetings.night', { returnObjects: true }) as string[]));
     }
 
     if (weekend) {
-        greetings.push(
-            `Happy weekend${n}! Working on something fun?`,
-            `Weekend mode. What's the passion project?`,
-            `No rush today. What do you want to explore?`,
-        );
+        greetings.push(...(i18n.t('home.greetings.weekend', { returnObjects: true }) as string[]));
     }
 
     if (isFriday(dayOfWeek) && timeSlot === 'afternoon') {
-        greetings.push(
-            `Friday afternoon. Home stretch!`,
-            `Almost weekend${n}! What's left to wrap up?`,
-        );
+        greetings.push(...(i18n.t('home.greetings.fridayAfternoon', { returnObjects: true }) as string[]));
     }
 
-    return greetings[Math.floor(Math.random() * greetings.length)] as string;
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)] as string;
+    return greeting.replace(/\{\{name\}\}/g, n).replace(/\{\{timeOfDay\}\}/g, timeOfDay);
 }
 
 interface EmptyHomeStateProps {

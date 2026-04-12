@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import { Plus, Trash2, FolderOpen, File } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { isTauri, pickPath } from '../../utils/tauri';
 import { shortenHomePath } from '../../utils/formatting';
 
@@ -30,12 +31,14 @@ interface PathListEditorProps {
 export function PathListEditor({
     paths,
     onChange,
-    placeholder = 'Enter a path (e.g., ~/Documents)',
+    placeholder,
     disabled = false,
     mode = 'directory',
 }: PathListEditorProps) {
+    const { t } = useTranslation();
     const [newPath, setNewPath] = useState('');
     const showBrowse = isTauri();
+    const inputPlaceholder = placeholder ?? t('settings.pathPlaceholder');
 
     const addPath = (path: string) => {
         const trimmed = path.trim();
@@ -80,7 +83,7 @@ export function PathListEditor({
                                 className="path-remove-btn"
                                 onClick={() => handleRemove(index)}
                                 disabled={disabled}
-                                title="Remove path"
+                                title={t('settings.removePath')}
                             >
                                 <Trash2 size={14} />
                             </button>
@@ -99,7 +102,7 @@ export function PathListEditor({
                             className="path-browse-btn"
                         >
                             <FolderOpen size={14} />
-                            Add folder
+                            {t('settings.addFolder')}
                         </button>
                         {mode === 'any' && (
                             <button
@@ -109,7 +112,7 @@ export function PathListEditor({
                                 className="path-browse-btn"
                             >
                                 <File size={14} />
-                                Add file
+                                {t('settings.addFile')}
                             </button>
                         )}
                     </>
@@ -120,7 +123,7 @@ export function PathListEditor({
                             value={newPath}
                             onChange={(e) => setNewPath(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder={placeholder}
+                            placeholder={inputPlaceholder}
                             disabled={disabled}
                             className="path-input"
                         />
@@ -129,7 +132,7 @@ export function PathListEditor({
                             onClick={handleAdd}
                             disabled={disabled || !newPath.trim()}
                             className="path-add-btn"
-                            title="Add path"
+                            title={t('settings.addPath')}
                         >
                             <Plus size={16} />
                         </button>

@@ -1,6 +1,7 @@
 // Individual task card for home page gallery
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, CheckCircle, Globe, FileSearch, Pencil, Terminal, Wrench, Pin, PinOff } from 'lucide-react';
 import type { ActiveTask, TaskStatus } from '../../types';
 import type { ToolCategory } from '../../utils/formatting';
@@ -15,12 +16,12 @@ const CATEGORY_ICONS: Record<ToolCategory, React.ComponentType<{ size?: number }
 
 const CATEGORY_ORDER: ToolCategory[] = ['web', 'read', 'write', 'execute', 'other'];
 
-const statusConfig: Record<TaskStatus, { label: string; className: string; Icon: typeof Loader2 }> = {
-    running: { label: 'Running', className: 'running', Icon: Loader2 },
-    needs_input: { label: 'Needs Input', className: 'needs-input', Icon: AlertCircle },
-    completed: { label: 'Completed', className: 'completed', Icon: CheckCircle },
-    stopped: { label: 'Stopped', className: 'stopped', Icon: AlertCircle },
-    pinned: { label: 'Pinned', className: 'pinned', Icon: Pin },
+const statusConfig: Record<TaskStatus, { labelKey: string; className: string; Icon: typeof Loader2 }> = {
+    running: { labelKey: 'tasks.running', className: 'running', Icon: Loader2 },
+    needs_input: { labelKey: 'tasks.needsInput', className: 'needs-input', Icon: AlertCircle },
+    completed: { labelKey: 'tasks.completed', className: 'completed', Icon: CheckCircle },
+    stopped: { labelKey: 'tasks.stopped', className: 'stopped', Icon: AlertCircle },
+    pinned: { labelKey: 'tasks.pinned', className: 'pinned', Icon: Pin },
 };
 
 interface TaskCardProps {
@@ -29,12 +30,13 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onClick }: TaskCardProps) {
+    const { t } = useTranslation();
     // Truncate reasoning to first line and limit length
     const reasoningPreview = task.reasoning
         ? task.reasoning.split('\n')[0]?.slice(0, 100) + (task.reasoning.length > 100 ? '...' : '')
         : undefined;
 
-    const { label, className, Icon } = statusConfig[task.status];
+    const { labelKey, className, Icon } = statusConfig[task.status];
 
     return (
         <div
@@ -52,7 +54,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
             <div className="task-card-header">
                 <Icon size={16} className={`task-status-icon ${className}`} />
                 <span className={`task-status-text ${className}`}>
-                    {label}
+                    {t(labelKey as any)}
                 </span>
                 {task.toolCategories && Object.keys(task.toolCategories).length > 0 && (
                     <span className="thoughts-icon-trail task-icon-trail">
@@ -88,8 +90,8 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
                             e.stopPropagation();
                             task.onTogglePin!();
                         }}
-                        aria-label={task.isPinned ? 'Unpin from home' : 'Pin to home'}
-                        title={task.isPinned ? 'Unpin from home' : 'Pin to home'}
+                        aria-label={task.isPinned ? t('tasks.unpinFromHome') : t('tasks.pinToHome')}
+                        title={task.isPinned ? t('tasks.unpinFromHome') : t('tasks.pinToHome')}
                     >
                         <PinOff size={14} className="pin-off-icon" />
                         <Pin size={14} className="pin-icon" />

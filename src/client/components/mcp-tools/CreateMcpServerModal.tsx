@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Terminal, Globe, Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { McpTransportType, McpConfirmationMode, CreateMcpServerInput } from '../../types/mcp';
 import { apiFetch } from '../../utils/api';
 
@@ -9,6 +10,7 @@ interface CreateMcpServerModalProps {
 }
 
 export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModalProps) {
+    const { t } = useTranslation();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [transportType, setTransportType] = useState<McpTransportType>('stdio');
@@ -88,10 +90,10 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                 onCreated();
             } else {
                 const data = await res.json();
-                setError(data.error || 'Failed to create MCP server');
+                setError(data.error || t('mcpTools.failedToCreate'));
             }
         } catch (e) {
-            setError('Failed to create MCP server');
+            setError(t('mcpTools.failedToCreate'));
         } finally {
             setIsCreating(false);
         }
@@ -107,7 +109,7 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
         <div className="modal-backdrop" onClick={handleBackdropClick}>
             <div className="modal mcp-server-modal">
                 <div className="modal-header">
-                    <h2>Add MCP Tool Server</h2>
+                    <h2>{t('mcpTools.addMcpServer')}</h2>
                     <button onClick={onClose} className="modal-close">
                         <X size={18} />
                     </button>
@@ -115,31 +117,31 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
 
                 <form onSubmit={handleSubmit} className="mcp-server-form">
                     <div className="form-group">
-                        <label htmlFor="server-name">Name *</label>
+                        <label htmlFor="server-name">{t('mcpTools.name')}</label>
                         <input
                             id="server-name"
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-'))}
-                            placeholder="my-mcp-server"
+                            placeholder={t('mcpTools.namePlaceholder')}
                             autoFocus
                         />
-                        <span className="form-hint">Used to namespace tools (e.g., my-mcp-server/tool-name)</span>
+                        <span className="form-hint">{t('mcpTools.nameHint')}</span>
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="server-description">Description</label>
+                        <label htmlFor="server-description">{t('mcpTools.description')}</label>
                         <input
                             id="server-description"
                             type="text"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Describe what this tool server provides"
+                            placeholder={t('mcpTools.descriptionPlaceholder')}
                         />
                     </div>
 
                     <div className="form-group">
-                        <label>Transport Type *</label>
+                        <label>{t('mcpTools.transportType')}</label>
                         <div className="transport-type-selector">
                             <button
                                 type="button"
@@ -147,8 +149,8 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                                 onClick={() => setTransportType('stdio')}
                             >
                                 <Terminal size={16} />
-                                <span>stdio</span>
-                                <span className="transport-hint">Local script or npm package</span>
+                                <span>{t('mcpTools.stdio')}</span>
+                                <span className="transport-hint">{t('mcpTools.stdioHint')}</span>
                             </button>
                             <button
                                 type="button"
@@ -156,15 +158,15 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                                 onClick={() => setTransportType('sse')}
                             >
                                 <Globe size={16} />
-                                <span>HTTP/SSE</span>
-                                <span className="transport-hint">Remote server endpoint</span>
+                                <span>{t('mcpTools.httpSse')}</span>
+                                <span className="transport-hint">{t('mcpTools.httpSseHint')}</span>
                             </button>
                         </div>
                     </div>
 
                     <div className="form-group">
                         <label htmlFor="server-path">
-                            {transportType === 'stdio' ? 'Command / Package' : 'Server URL'} *
+                            {transportType === 'stdio' ? t('mcpTools.commandLabel') : t('mcpTools.serverUrlLabel')} *
                         </label>
                         <input
                             id="server-path"
@@ -173,33 +175,33 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                             onChange={(e) => setPath(e.target.value)}
                             placeholder={
                                 transportType === 'stdio'
-                                    ? '@modelcontextprotocol/server-filesystem'
-                                    : 'https://mcp.example.com/sse'
+                                    ? t('mcpTools.commandPlaceholder')
+                                    : t('mcpTools.serverUrlPlaceholder')
                             }
                         />
                         <span className="form-hint">
                             {transportType === 'stdio'
-                                ? 'npm package name, path to .py/.js script, or executable'
-                                : 'HTTP(S) endpoint URL'}
+                                ? t('mcpTools.commandHint')
+                                : t('mcpTools.serverUrlHint')}
                         </span>
                     </div>
 
                     {transportType === 'sse' && (
                         <div className="form-group">
-                            <label htmlFor="server-api-key">API Key</label>
+                            <label htmlFor="server-api-key">{t('mcpTools.apiKey')}</label>
                             <input
                                 id="server-api-key"
                                 type="password"
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
-                                placeholder="Optional authentication key"
+                                placeholder={t('mcpTools.apiKeyPlaceholder')}
                             />
                         </div>
                     )}
 
                     {transportType === 'stdio' && (
                         <div className="form-group">
-                            <label>Environment Variables</label>
+                            <label>{t('mcpTools.envVars')}</label>
                             <div className="env-vars-list">
                                 {envVars.map((envVar, index) => (
                                     <div key={index} className="env-var-row">
@@ -207,7 +209,7 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                                             type="text"
                                             value={envVar.key}
                                             onChange={(e) => handleEnvVarChange(index, 'key', e.target.value)}
-                                            placeholder="KEY"
+                                            placeholder={t('mcpTools.envKeyPlaceholder')}
                                             className="env-var-key"
                                         />
                                         <span className="env-var-separator">=</span>
@@ -215,7 +217,7 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                                             type="text"
                                             value={envVar.value}
                                             onChange={(e) => handleEnvVarChange(index, 'value', e.target.value)}
-                                            placeholder="value"
+                                            placeholder={t('mcpTools.envValuePlaceholder')}
                                             className="env-var-value"
                                         />
                                         <button
@@ -233,28 +235,28 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                                     className="btn-text add-env-var-btn"
                                 >
                                     <Plus size={14} />
-                                    <span>Add variable</span>
+                                    <span>{t('mcpTools.addVariable')}</span>
                                 </button>
                             </div>
                         </div>
                     )}
 
                     <div className="form-group">
-                        <label htmlFor="confirmation-mode">Confirmation Mode</label>
+                        <label htmlFor="confirmation-mode">{t('mcpTools.confirmationMode')}</label>
                         <select
                             id="confirmation-mode"
                             value={confirmationMode}
                             onChange={(e) => setConfirmationMode(e.target.value as McpConfirmationMode)}
                             className="form-select"
                         >
-                            <option value="always">Always require confirmation</option>
-                            <option value="unsafe_only">Only for unsafe operations</option>
-                            <option value="never">Never require confirmation</option>
+                            <option value="always">{t('mcpTools.confirmAlways')}</option>
+                            <option value="unsafe_only">{t('mcpTools.confirmUnsafe')}</option>
+                            <option value="never">{t('mcpTools.confirmNever')}</option>
                         </select>
                         <span className="form-hint">
-                            {confirmationMode === 'always' && 'Every action requires your approval'}
-                            {confirmationMode === 'unsafe_only' && 'Require approval for only unsafe actions (safe actions are auto-approved)'}
-                            {confirmationMode === 'never' && 'All actions are auto-approved'}
+                            {confirmationMode === 'always' && t('mcpTools.confirmAlwaysHint')}
+                            {confirmationMode === 'unsafe_only' && t('mcpTools.confirmUnsafeHint')}
+                            {confirmationMode === 'never' && t('mcpTools.confirmNeverHint')}
                         </span>
                     </div>
 
@@ -265,25 +267,25 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                                 checked={enabled}
                                 onChange={(e) => setEnabled(e.target.checked)}
                             />
-                            <span>Enable server</span>
+                            <span>{t('mcpTools.enableServer')}</span>
                         </label>
-                        <span className="form-hint">Disabled servers won't connect or provide tools</span>
+                        <span className="form-hint">{t('mcpTools.disabledHint')}</span>
                     </div>
 
                     {error && <div className="form-error">{error}</div>}
 
                     <div className="modal-actions">
                         <button type="button" onClick={onClose} className="btn-secondary">
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" disabled={!canSubmit} className="btn-primary">
                             {isCreating ? (
                                 <>
                                     <Loader2 size={16} className="spinning" />
-                                    <span>Adding...</span>
+                                    <span>{t('mcpTools.adding')}</span>
                                 </>
                             ) : (
-                                'Add Server'
+                                t('mcpTools.addServer')
                             )}
                         </button>
                     </div>

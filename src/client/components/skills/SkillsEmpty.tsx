@@ -2,19 +2,21 @@
 
 import React from 'react';
 import { Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function SkillsEmpty() {
+    const { t } = useTranslation();
     return (
         <div className="empty-state skills-empty">
             <Zap className="empty-icon" size={32} strokeWidth={1.5} />
-            <h2>No Skills Found</h2>
-            <p>Skills extend Pipali's capabilities with custom instructions.</p>
+            <h2>{t('skills.noSkillsTitle')}</h2>
+            <p>{t('skills.noSkillsDescription')}</p>
             <p className="empty-hint">
-                Create a skill by adding a <code>SKILL.md</code> file in:
+                {t('skills.noSkillsHint')}<code>{t('skills.skillMdFile')}</code>{t('skills.fileIn')}
             </p>
             <ul className="skills-paths">
-                <li><code>~/.pipali/skills/your-skill/SKILL.md</code> (global)</li>
-                <li><code>./.pipali/skills/your-skill/SKILL.md</code> (local)</li>
+                <li><code>{t('skills.globalPath')}</code>{t('skills.globalLabel')}</li>
+                <li><code>{t('skills.localPath')}</code>{t('skills.localLabel')}</li>
             </ul>
         </div>
     );

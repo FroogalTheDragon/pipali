@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Trash2, FileText, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { SkillInfo } from '../../types/skills';
 import { apiFetch } from '../../utils/api';
 
@@ -13,6 +14,7 @@ interface SkillDetailModalProps {
 }
 
 export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: SkillDetailModalProps) {
+    const { t } = useTranslation();
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -69,10 +71,10 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
                 onClose();
             } else {
                 const data = await res.json();
-                setError(data.error || 'Failed to save skill');
+                setError(data.error || t('skills.failedToSave'));
             }
         } catch (e) {
-            setError('Failed to save skill');
+            setError(t('skills.failedToSave'));
         } finally {
             setIsSaving(false);
         }
@@ -91,11 +93,11 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
                 onDeleted();
             } else {
                 const data = await res.json();
-                setError(data.error || 'Failed to delete skill');
+                setError(data.error || t('skills.failedToDelete'));
                 setShowDeleteConfirm(false);
             }
         } catch (e) {
-            setError('Failed to delete skill');
+            setError(t('skills.failedToDelete'));
             setShowDeleteConfirm(false);
         } finally {
             setIsDeleting(false);
@@ -137,23 +139,23 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
 
                 <div className="skill-detail-content">
                     <div className="skill-detail-section">
-                        <label htmlFor="skill-description" className="skill-detail-label">Description</label>
+                        <label htmlFor="skill-description" className="skill-detail-label">{t('skills.description')}</label>
                         <textarea
                             id="skill-description"
                             className="skill-detail-textarea skill-detail-description-input"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Describe what the skill does and when it should be used"
+                            placeholder={t('skills.descriptionPlaceholder')}
                             rows={2}
                         />
                     </div>
 
                     <div className="skill-detail-section">
-                        <label htmlFor="skill-instructions" className="skill-detail-label">Instructions</label>
+                        <label htmlFor="skill-instructions" className="skill-detail-label">{t('skills.instructions')}</label>
                         {isLoadingInstructions ? (
                             <div className="skill-detail-loading">
                                 <Loader2 size={16} className="spinning" />
-                                <span>Loading...</span>
+                                <span>{t('common.loading')}</span>
                             </div>
                         ) : (
                             <textarea
@@ -161,14 +163,14 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
                                 className="skill-detail-textarea skill-detail-instructions-input"
                                 value={instructions}
                                 onChange={(e) => setInstructions(e.target.value)}
-                                placeholder="Detailed instructions for how to use this skill..."
+                                placeholder={t('skills.instructionsPlaceholder')}
                                 rows={10}
                             />
                         )}
                     </div>
 
                     <div className="skill-detail-section">
-                        <span className="skill-detail-label">Location</span>
+                        <span className="skill-detail-label">{t('skills.location')}</span>
                         <div className="skill-detail-location">
                             <FileText size={14} />
                             <code>{skill.location}</code>
@@ -181,14 +183,14 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
                 <div className="modal-actions skill-detail-actions">
                     {showDeleteConfirm ? (
                         <>
-                            <span className="delete-confirm-text">Delete this skill?</span>
+                            <span className="delete-confirm-text">{t('skills.deleteSkillConfirm')}</span>
                             <button
                                 type="button"
                                 onClick={() => setShowDeleteConfirm(false)}
                                 className="btn-secondary"
                                 disabled={isDeleting}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 type="button"
@@ -199,12 +201,12 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
                                 {isDeleting ? (
                                     <>
                                         <Loader2 size={16} className="spinning" />
-                                        <span>Deleting...</span>
+                                        <span>{t('skills.deleting')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Trash2 size={16} />
-                                        <span>Delete</span>
+                                        <span>{t('common.delete')}</span>
                                     </>
                                 )}
                             </button>
@@ -217,7 +219,7 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
                                 className="btn-danger-outline"
                             >
                                 <Trash2 size={16} />
-                                <span>Delete</span>
+                                <span>{t('common.delete')}</span>
                             </button>
                             <button
                                 type="button"
@@ -228,12 +230,12 @@ export function SkillDetailModal({ skill, onClose, onDeleted, onUpdated }: Skill
                                 {isSaving ? (
                                     <>
                                         <Loader2 size={16} className="spinning" />
-                                        <span>Saving...</span>
+                                        <span>{t('skills.saving')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Save size={16} />
-                                        <span>Save</span>
+                                        <span>{t('skills.save')}</span>
                                     </>
                                 )}
                             </button>

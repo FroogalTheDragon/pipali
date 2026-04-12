@@ -1,6 +1,7 @@
 // Modal for creating a new automation
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, Calendar, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import type { FrequencyType, DayOfWeek } from '../../types/automations';
 import { DAYS_OF_WEEK, TIME_OPTIONS, DAY_OF_MONTH_OPTIONS, MINUTE_OPTIONS } from '../../types/automations';
@@ -11,21 +12,25 @@ interface CreateAutomationModalProps {
     onCreated: () => void;
 }
 
-const FREQUENCY_OPTIONS: { value: FrequencyType; label: string }[] = [
-    { value: 'hour', label: 'Hour' },
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-];
-
-const INSTRUCTION_SUGGESTIONS = [
-    { label: 'Make a picture of...', prefix: 'Make a picture of ' },
-    { label: 'Generate a summary of...', prefix: 'Generate a summary of ' },
-    { label: 'Create a newsletter of...', prefix: 'Create a newsletter of ' },
-    { label: 'Notify me when...', prefix: 'Notify me when ' },
-];
-
 export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationModalProps) {
+    const { t } = useTranslation();
+    const onTheLabel = t('automations.onThe');
+    const atLabel = t('automations.at');
+
+    const FREQUENCY_OPTIONS: { value: FrequencyType; label: string }[] = [
+        { value: 'hour', label: t('automations.frequencyHour') },
+        { value: 'day', label: t('automations.frequencyDay') },
+        { value: 'week', label: t('automations.frequencyWeek') },
+        { value: 'month', label: t('automations.frequencyMonth') },
+    ];
+
+    const INSTRUCTION_SUGGESTIONS = [
+        { label: t('automations.suggestions.makePicture'), prefix: 'Make a picture of ' },
+        { label: t('automations.suggestions.generateSummary'), prefix: 'Generate a summary of ' },
+        { label: t('automations.suggestions.createNewsletter'), prefix: 'Create a newsletter of ' },
+        { label: t('automations.suggestions.notifyWhen'), prefix: 'Notify me when ' },
+    ];
+
     // Instructions state
     const [instructions, setInstructions] = useState('');
 
@@ -106,10 +111,10 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                 onCreated();
             } else {
                 const data = await res.json();
-                setError(typeof data.error === 'string' ? data.error : 'Failed to create routine');
+                setError(typeof data.error === 'string' ? data.error : t('automations.failedToCreate'));
             }
         } catch (e) {
-            setError('Failed to create routine');
+            setError(t('automations.failedToCreate'));
         } finally {
             setIsCreating(false);
         }
@@ -129,7 +134,7 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
         <div className="modal-backdrop" onClick={handleBackdropClick}>
             <div className="modal automation-modal">
                 <div className="modal-header">
-                    <h2>Create Routine</h2>
+                    <h2>{t('automations.createRoutine')}</h2>
                     <button onClick={onClose} className="modal-close">
                         <X size={18} />
                     </button>
@@ -139,8 +144,8 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                     {/* Instructions Section - First */}
                     <div className="form-section">
                         <div className="form-section-header">
-                            <h3>Instructions</h3>
-                            <p className="form-section-subtitle">What do you want Pipali to do?</p>
+                            <h3>{t('automations.instructions')}</h3>
+                            <p className="form-section-subtitle">{t('automations.instructionsSubtitle')}</p>
                         </div>
 
                         <div className="instruction-suggestions">
@@ -159,7 +164,7 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                         <textarea
                             value={instructions}
                             onChange={(e) => setInstructions(e.target.value)}
-                            placeholder="Create a summary of the latest news about AI in healthcare."
+                            placeholder={t('automations.instructionsPlaceholder')}
                             rows={4}
                             className="instructions-textarea"
                         />
@@ -173,9 +178,9 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                             onClick={() => setHasSchedule(!hasSchedule)}
                         >
                             {hasSchedule ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                            <span>Schedule</span>
+                            <span>{t('automations.schedule')}</span>
                             <span className="schedule-toggle-hint">
-                                {hasSchedule ? '' : '(Optional - run on a recurring schedule)'}
+                                {hasSchedule ? '' : t('automations.scheduleHint')}
                             </span>
                         </button>
 
@@ -184,7 +189,7 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                                 <div className="frequency-selector">
                                     <div className="frequency-row">
                                         <Calendar size={16} className="frequency-icon" />
-                                        <span className="frequency-label">Every</span>
+                                        <span className="frequency-label">{t('automations.every')}</span>
                                         <select
                                             value={frequency}
                                             onChange={(e) => setFrequency(e.target.value as FrequencyType)}
@@ -199,10 +204,10 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                                     {/* Day of Week selector for weekly */}
                                     {frequency === 'week' && (
                                         <div className="frequency-detail">
-                                            <p className="frequency-detail-label">Every week, on which day should the automation run?</p>
+                                            <p className="frequency-detail-label">{t('automations.weekDayPrompt')}</p>
                                             <div className="frequency-row">
                                                 <Calendar size={16} className="frequency-icon" />
-                                                <span className="frequency-label">On</span>
+                                                <span className="frequency-label">{t('automations.on')}</span>
                                                 <select
                                                     value={dayOfWeek}
                                                     onChange={(e) => setDayOfWeek(e.target.value as DayOfWeek)}
@@ -219,10 +224,10 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                                     {/* Day of Month selector for monthly */}
                                     {frequency === 'month' && (
                                         <div className="frequency-detail">
-                                            <p className="frequency-detail-label">Every month, on which day should the automation run?</p>
+                                            <p className="frequency-detail-label">{t('automations.monthDayPrompt')}</p>
                                             <div className="frequency-row">
                                                 <Calendar size={16} className="frequency-icon" />
-                                                <span className="frequency-label">On the</span>
+                                                {onTheLabel ? <span className="frequency-label">{onTheLabel}</span> : null}
                                                 <select
                                                     value={dayOfMonth}
                                                     onChange={(e) => setDayOfMonth(Number(e.target.value))}
@@ -239,10 +244,10 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                                     {/* Minute selector for hourly */}
                                     {frequency === 'hour' && (
                                         <div className="frequency-detail">
-                                            <p className="frequency-detail-label">Every hour, at which minute should the automation run?</p>
+                                            <p className="frequency-detail-label">{t('automations.minutePrompt')}</p>
                                             <div className="frequency-row">
                                                 <Clock size={16} className="frequency-icon" />
-                                                <span className="frequency-label">At minute</span>
+                                                <span className="frequency-label">{t('automations.atMinute')}</span>
                                                 <select
                                                     value={minuteOfHour}
                                                     onChange={(e) => setMinuteOfHour(Number(e.target.value))}
@@ -260,10 +265,10 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
                                 {/* Time Section - only show for non-hourly frequencies */}
                                 {frequency !== 'hour' && (
                                     <div className="time-selector">
-                                        <p className="frequency-detail-label">At what time should the automation run?</p>
+                                        <p className="frequency-detail-label">{t('automations.timePrompt')}</p>
                                         <div className="frequency-row">
                                             <Clock size={16} className="frequency-icon" />
-                                            <span className="frequency-label">At</span>
+                                            {atLabel ? <span className="frequency-label">{atLabel}</span> : null}
                                             <select
                                                 value={time}
                                                 onChange={(e) => setTime(e.target.value)}
@@ -284,16 +289,16 @@ export function CreateAutomationModal({ onClose, onCreated }: CreateAutomationMo
 
                     <div className="modal-actions">
                         <button type="button" onClick={onClose} className="btn-secondary">
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" disabled={!canSubmit} className="btn-primary btn-save">
                             {isCreating ? (
                                 <>
                                     <Loader2 size={16} className="spinning" />
-                                    <span>Creating...</span>
+                                    <span>{t('automations.creating')}</span>
                                 </>
                             ) : (
-                                'Save'
+                                t('common.save')
                             )}
                         </button>
                     </div>
