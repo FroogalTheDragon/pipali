@@ -4,10 +4,12 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import en from './locales/en.json';
 import fr from './locales/fr.json';
+import zh from './locales/zh.json';
 
 export const SUPPORTED_LANGUAGES = [
     { code: 'en', label: 'English' },
     { code: 'fr', label: 'Français' },
+    { code: 'zh', label: '中文' },
 ] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]['code'];
@@ -19,6 +21,7 @@ i18n
         resources: {
             en: { translation: en },
             fr: { translation: fr },
+            zh: { translation: zh },
         },
         fallbackLng: 'en',
         interpolation: { escapeValue: false },

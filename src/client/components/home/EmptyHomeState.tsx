@@ -36,6 +36,7 @@ function isMonday(day: number): boolean {
 export function formatGreetingName(name?: string, language = i18n.resolvedLanguage ?? i18n.language): string {
     const trimmed = name?.trim();
     if (!trimmed) return '';
+    if (language.startsWith('zh')) return `，${trimmed}`;
     return `, ${trimmed}`;
 }
 
