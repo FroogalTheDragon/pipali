@@ -1201,6 +1201,26 @@ const App = () => {
         }
     };
 
+    // ===== Billing Actions =====
+
+    const handleBillingDismiss = (messageId: string) => {
+        const next = messages.filter(m => m.id !== messageId);
+        setChatMessages(next);
+        if (conversationId) syncConversationState(conversationId, next);
+    };
+
+    const handleBillingContinue = (messageId: string) => {
+        // Remove the billing message and send a continue message to resume the task
+        handleBillingDismiss(messageId);
+        if (!conversationId || !isConnected) return;
+        const clientMessageId = generateUUID();
+        const runId = generateUUID();
+        const continueMessage = 'Continue';
+        addOptimisticUserMessage({ id: clientMessageId, stableId: clientMessageId, role: 'user', content: continueMessage }, conversationId);
+        startOptimisticRun(conversationId, runId, clientMessageId);
+        sendWsMessage(continueMessage, conversationId, { clientMessageId, runId, optimistic: false });
+    };
+
     // ===== Message Sending =====
 
     const sendConfirmationResponse = (convId: string, requestId: string, optionId: string, guidance?: string) => {
@@ -1478,7 +1498,7 @@ const App = () => {
                     )}
                     {currentPage === 'chat' && (
                         <ErrorBoundary>
-                            <MessageList messages={messages} conversationId={conversationId} platformFrontendUrl={platformFrontendUrl} onDeleteMessage={deleteMessage} userFirstName={userName?.split(' ')[0] ?? authStatus?.user?.name?.split(' ')[0]} />
+                            <MessageList messages={messages} conversationId={conversationId} platformFrontendUrl={platformFrontendUrl} onDeleteMessage={deleteMessage} onBillingContinue={handleBillingContinue} onBillingDismiss={handleBillingDismiss} userFirstName={userName?.split(' ')[0] ?? authStatus?.user?.name?.split(' ')[0]} />
                         </ErrorBoundary>
                     )}
 

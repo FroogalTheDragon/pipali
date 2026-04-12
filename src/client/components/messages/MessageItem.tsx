@@ -18,9 +18,11 @@ interface MessageItemProps {
     message: Message;
     platformFrontendUrl?: string;
     onDelete?: (messageId: string, role: 'user' | 'assistant') => void;
+    onBillingContinue?: (messageId: string) => void;
+    onBillingDismiss?: (messageId: string) => void;
 }
 
-export function MessageItem({ message, platformFrontendUrl, onDelete }: MessageItemProps) {
+export function MessageItem({ message, platformFrontendUrl, onDelete, onBillingContinue, onBillingDismiss }: MessageItemProps) {
     const isUser = message.role === 'user';
     const [isHovered, setIsHovered] = useState(false);
 
@@ -34,6 +36,8 @@ export function MessageItem({ message, platformFrontendUrl, onDelete }: MessageI
                     code={message.billingInfo.code}
                     message={message.billingInfo.message}
                     platformFrontendUrl={platformFrontendUrl}
+                    onContinue={onBillingContinue ? () => onBillingContinue(message.id) : undefined}
+                    onDismiss={onBillingDismiss ? () => onBillingDismiss(message.id) : undefined}
                 />
             </div>
         );
