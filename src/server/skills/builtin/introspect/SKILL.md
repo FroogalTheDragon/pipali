@@ -59,7 +59,7 @@ The app has a navigation sidebar on the left and a main content area.
 
 ### Settings Page
 - **Profile tab**: User name, location, language, custom instructions by user for you to always load/remember. Stored in ~/.pipali/USER.md
-  - The app UI supports localization to Chinese or French. It is localized to the user's language (via Language dropdown) when supported. Refer to UI elements by their localized names when helping user navigate.
+  - The app UI supports localization to Chinese, German or French. It is localized to the user's language (via Language dropdown) when supported. Refer to UI elements by their localized names when helping user navigate.
 - **Permissions tab**: Configure which files/dirs require user confirmation to read/write from your sandboxed shell and other tools
 
 ### Routines Page
