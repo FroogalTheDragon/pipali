@@ -294,7 +294,15 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                                         <select
                                             id="language"
                                             value={i18n.language.slice(0, 2)}
-                                            onChange={(e) => i18n.changeLanguage(e.target.value)}
+                                            onChange={(e) => {
+                                                const lang = e.target.value;
+                                                i18n.changeLanguage(lang);
+                                                apiFetch('/api/user/context', {
+                                                    method: 'PUT',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ language: lang }),
+                                                }).catch(() => {});
+                                            }}
                                         >
                                             {SUPPORTED_LANGUAGES.map(lang => (
                                                 <option key={lang.code} value={lang.code}>

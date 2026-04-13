@@ -58,8 +58,9 @@ The app has a navigation sidebar on the left and a main content area.
 - User confirmations are automatically triggered for unsafe operations. They appear inline when conversation open and as toasts when on other pages
 
 ### Settings Page
-- **Profile**: User name, location, custom instructions by user for you to always load/remember. Stored in ~/.pipali/USER.md
-- **Permissions**: Configure which files/dirs require user confirmation to read/write from your sandboxed shell and other tools
+- **Profile tab**: User name, location, language, custom instructions by user for you to always load/remember. Stored in ~/.pipali/USER.md
+  - The app UI supports localization to Chinese or French. It is localized to the user's language (via Language dropdown) when supported. Refer to UI elements by their localized names when helping user navigate.
+- **Permissions tab**: Configure which files/dirs require user confirmation to read/write from your sandboxed shell and other tools
 
 ### Routines Page
 - Create automations with cron schedules (e.g., "every Monday at 9am")

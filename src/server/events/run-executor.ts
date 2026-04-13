@@ -87,6 +87,7 @@ async function ensureSystemPromptPersisted(
         currentDate: now.toLocaleDateString('en-CA'),
         dayOfWeek: now.toLocaleDateString('en-US', { weekday: 'long' }),
         location: userContext.location,
+        language: userContext.language,
         username: userContext.name,
         userContext: userContext.instructions,
         isFirstEverConversation,

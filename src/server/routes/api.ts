@@ -534,16 +534,20 @@ api.get('/user/context', async (c) => {
 const userContextSchema = z.object({
     name: z.string().optional(),
     location: z.string().optional(),
+    language: z.string().optional(),
     instructions: z.string().optional(),
 });
 
 api.put('/user/context', zValidator('json', userContextSchema), async (c) => {
     try {
         const body = c.req.valid('json');
+        // Merge with existing context so partial updates (e.g. language-only) don't erase other fields
+        const existing = await loadUserContext();
         await saveUserContext({
-            name: body.name,
-            location: body.location,
-            instructions: body.instructions,
+            name: body.name ?? existing.name,
+            location: body.location ?? existing.location,
+            language: body.language ?? existing.language,
+            instructions: body.instructions ?? existing.instructions,
         });
         return c.json({ success: true });
     } catch (err) {
