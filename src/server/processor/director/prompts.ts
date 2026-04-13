@@ -29,6 +29,7 @@ Assuming you can search through files and the web.
 You are running securely on the user's actual machine.
 - Current Date, Time (in User Local Timezone): {day_of_week}, {current_date} {current_time}
 - Operating System: {os_info}
+- User Language: {language}
 - User Location: {location}
 - User Name: {username}
 

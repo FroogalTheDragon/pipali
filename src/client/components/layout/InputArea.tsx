@@ -9,6 +9,7 @@ import { formatFileSize } from '../../utils/formatting';
 import { localImageSrc } from '../../utils/markdown';
 import { getApiBaseUrl } from '../../utils/api';
 import { isTauri } from '../../utils/tauri';
+import { useTranslation } from 'react-i18next';
 
 interface InputAreaProps {
     input: string;
@@ -37,18 +38,6 @@ interface InputAreaProps {
 }
 
 import { MOD_KEY, ALT_KEY } from '../../utils/platform';
-
-
-const HOME_HINTS = [
-    `Tip: Use ${MOD_KEY}Enter to start task in background`,
-];
-const CHAT_HINTS = [
-    `Tip: Use ${MOD_KEY}Enter to fork this conversation`,
-];
-
-function pickRandom(arr: string[]): string {
-    return arr[Math.floor(Math.random() * arr.length)] as string;
-}
 
 const SPREADSHEET_EXTS = ['.xlsx', '.xls', '.csv'];
 const TEXT_EXTS = ['.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.toml', '.log'];
@@ -87,14 +76,17 @@ export function InputArea({
     setShowModelDropdown,
     onSelectModel,
 }: InputAreaProps) {
+    const { t } = useTranslation();
     const hasFiles = stagedFiles.length > 0;
     const canSend = input.trim() || hasFiles;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const modelDropdownRef = useRef<HTMLDivElement>(null);
     const showHint = useRef(Math.random() < 0.05).current;
     const placeholder = !showHint
-        ? 'Ask anything'
-        : pickRandom(conversationId ? CHAT_HINTS : HOME_HINTS);
+        ? t('inputArea.askAnything')
+        : conversationId
+            ? t('inputArea.tipForkConversation', { modKey: MOD_KEY })
+            : t('inputArea.tipBackgroundTask', { modKey: MOD_KEY });
 
     // Close model dropdown when clicking outside
     useEffect(() => {
@@ -122,7 +114,7 @@ export function InputArea({
                 <div className="drop-zone-overlay">
                     <div className="drop-zone-inner">
                         <Upload size={32} />
-                        <p>Drop files here</p>
+                        <p>{t('inputArea.dropFiles')}</p>
                     </div>
                 </div>
             )}
@@ -169,7 +161,7 @@ export function InputArea({
                                         type="button"
                                         className="remove-file"
                                         onClick={() => onRemoveFile?.(file.id)}
-                                        title="Remove file"
+                                        title={t('inputArea.removeFile')}
                                     >
                                         <X size={14} />
                                     </button>
@@ -209,14 +201,14 @@ export function InputArea({
                         placeholder={
                             pendingConfirmation
                                 ? (showHint && pendingConfirmation.options[0]
-                                    ? `Tip: ${ALT_KEY}1 to "${pendingConfirmation.options[0].label}"`
+                                    ? t('inputArea.tipConfirmation', { altKey: ALT_KEY, label: pendingConfirmation.options[0].label })
                                     : pendingConfirmation.operation === 'ask_user'
-                                        ? "Type a custom response…"
-                                        : "Type alternative instructions…")
+                                        ? t('inputArea.customResponse')
+                                        : t('inputArea.alternativeInstructions'))
                                 : isStopped
-                                    ? "Stopped. Type a new message..."
+                                    ? t('inputArea.stopped')
                                     : isProcessing
-                                        ? "Type to interrupt with a message..."
+                                        ? t('inputArea.processing')
                                         : placeholder
                         }
                         rows={1}
@@ -244,7 +236,7 @@ export function InputArea({
                                     onClick={() => setShowModelDropdown(!showModelDropdown)}
                                 >
                                     <span className="model-name">
-                                        {selectedModel?.friendlyName || selectedModel?.name || 'Select model'}
+                                        {selectedModel?.friendlyName || selectedModel?.name || t('inputArea.selectModel')}
                                     </span>
                                     <ChevronDown size={12} className={showModelDropdown ? 'rotated' : ''} />
                                 </button>
@@ -253,7 +245,7 @@ export function InputArea({
                                     <div className="model-dropdown">
                                         {models.length === 0 ? (
                                             <div className="model-dropdown-empty">
-                                                No models available
+                                                {t('inputArea.noModelsAvailable')}
                                             </div>
                                         ) : (
                                             models.map(model => (
@@ -292,7 +284,7 @@ export function InputArea({
                                 type="button"
                                 className="toolbar-button"
                                 onClick={() => isTauri() ? onPickFiles?.() : fileInputRef.current?.click()}
-                                title="Attach files"
+                                title={t('inputArea.attachFiles')}
                             >
                                 <Paperclip size={16} />
                             </button>
@@ -302,7 +294,7 @@ export function InputArea({
                                         type="submit"
                                         disabled={!isConnected}
                                         className="action-button send"
-                                        title="Send message (soft interrupt)"
+                                        title={t('inputArea.sendMessage')}
                                     >
                                         <ArrowUp size={16} />
                                     </button>
@@ -311,7 +303,7 @@ export function InputArea({
                                         type="button"
                                         onClick={onStop}
                                         className="action-button stop"
-                                        title="Stop (Esc)"
+                                        title={t('inputArea.stop')}
                                     >
                                         <Square size={16} />
                                     </button>

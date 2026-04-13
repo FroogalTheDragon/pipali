@@ -1,15 +1,17 @@
 // Empty state when no automations are configured
 
 import { Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function AutomationsEmpty() {
+    const { t } = useTranslation();
     return (
         <div className="empty-state automations-empty">
             <Clock className="empty-icon" size={32} strokeWidth={1.5} />
-            <h2>No Routines</h2>
-            <p>Routines run tasks on a schedule without manual intervention.</p>
+            <h2>{t('automations.noRoutinesTitle')}</h2>
+            <p>{t('automations.noRoutinesDescription')}</p>
             <p className="empty-hint">
-                Create a routine to have Pipali perform tasks automatically.
+                {t('automations.noRoutinesHint')}
             </p>
         </div>
     );

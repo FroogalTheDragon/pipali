@@ -10,6 +10,7 @@ import { apiFetch } from '../../utils/api';
 
 import { MOD_KEY } from '../../utils/platform';
 import { openInBrowser } from '../../utils/tauri';
+import { useTranslation } from 'react-i18next';
 
 const MAX_VISIBLE_CHATS = 5;
 
@@ -117,6 +118,7 @@ export function Sidebar({
     const [changelogNotes, setChangelogNotes] = useState<string | null>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const { theme, setTheme, isDark } = useTheme();
+    const { t } = useTranslation();
 
     // Load Gravatar URL when user email is available but no profile picture
     const userEmail = authStatus?.user?.email;
@@ -406,7 +408,7 @@ export function Sidebar({
                 onKeyDown={(e) => handleConversationKeyDown(conv.id, e)}
                 role="button"
                 tabIndex={inModal ? -1 : 0}
-                aria-label={`Open conversation: ${conv.title}`}
+                aria-label={t('sidebar.openConversation', { title: conv.title })}
                 aria-selected={isSelected}
             >
                 {/* Activity indicator */}
@@ -461,7 +463,7 @@ export function Sidebar({
                     <button
                         className="menu-btn"
                         onClick={(e) => toggleConversationMenu(conv.id, e, inModal ? 'modal' : 'sidebar')}
-                        aria-label="Conversation actions"
+                        aria-label={t('sidebar.conversationActions')}
                     >
                         <MoreVertical size={16} />
                     </button>
@@ -477,11 +479,11 @@ export function Sidebar({
                                 role="menuitem"
                             >
                                 <Pencil size={14} />
-                                <span>Rename</span>
+                                <span>{t('common.rename')}</span>
                             </button>
 
                             <button
-                                title={conv.isPinned ? 'Unpin from Home' : 'Pin to Home'}
+                                title={conv.isPinned ? t('sidebar.unpinFromHome') : t('sidebar.pinToHome')}
                                 className="conversation-menu-item"
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -492,7 +494,7 @@ export function Sidebar({
                                 role="menuitem"
                             >
                                 {conv.isPinned ? <PinOff size={14} /> : <Pin size={14} />}
-                                <span>{conv.isPinned ? 'Unpin' : 'Pin'}</span>
+                                <span>{conv.isPinned ? t('sidebar.unpin') : t('sidebar.pin')}</span>
                             </button>
 
                             <div className={`conversation-menu-submenu-container ${showCopySubmenu ? 'open' : ''}`}>
@@ -505,7 +507,7 @@ export function Sidebar({
                                     role="menuitem"
                                 >
                                     <Copy size={14} />
-                                    <span>Copy</span>
+                                    <span>{t('sidebar.copy')}</span>
                                     <ChevronRight size={12} className="submenu-arrow" />
                                 </button>
                                 <div className="conversation-submenu" role="menu">
@@ -520,7 +522,7 @@ export function Sidebar({
                                         role="menuitem"
                                     >
                                         <Link size={14} />
-                                        <span>Link</span>
+                                        <span>{t('sidebar.copyLink')}</span>
                                     </button>
                                     <button
                                         className="conversation-menu-item"
@@ -538,7 +540,7 @@ export function Sidebar({
                                         ) : (
                                             <MessageSquare size={14} />
                                         )}
-                                        <span>Messages</span>
+                                        <span>{t('sidebar.copyMessages')}</span>
                                     </button>
                                     <button
                                         className="conversation-menu-item"
@@ -556,7 +558,7 @@ export function Sidebar({
                                         ) : (
                                             <FileText size={14} />
                                         )}
-                                        <span>Trace</span>
+                                        <span>{t('sidebar.copyTrace')}</span>
                                     </button>
                                 </div>
                             </div>
@@ -571,7 +573,7 @@ export function Sidebar({
                                 role="menuitem"
                             >
                                 <Trash2 size={14} />
-                                <span>Delete</span>
+                                <span>{t('common.delete')}</span>
                             </button>
                         </div>
                     )}
@@ -595,12 +597,12 @@ export function Sidebar({
                     <div className="sidebar-header-row">
                         <button className="new-chat-btn" onClick={onNewChat}>
                             <Plus size={18} />
-                            <span>New chat</span>
+                            <span>{t('sidebar.newChat')}</span>
                         </button>
                         <button
                             className="sidebar-close-btn"
                             onClick={onClose}
-                            aria-label="Close sidebar"
+                            aria-label={t('sidebar.closeSidebar')}
                         >
                             <X size={20} />
                         </button>
@@ -613,28 +615,28 @@ export function Sidebar({
                         onClick={onGoToSkills}
                     >
                         <Zap size={16} />
-                        <span>Skills</span>
+                        <span>{t('sidebar.skills')}</span>
                     </button>
                     <button
                         className={`sidebar-nav-btn ${currentPage === 'automations' ? 'active' : ''}`}
                         onClick={onGoToAutomations}
                     >
                         <Clock size={16} />
-                        <span>Routines</span>
+                        <span>{t('sidebar.routines')}</span>
                     </button>
                     <button
                         className={`sidebar-nav-btn ${currentPage === 'mcp-tools' ? 'active' : ''}`}
                         onClick={onGoToMcpTools}
                     >
                         <Hammer size={16} />
-                        <span>Tools</span>
+                        <span>{t('sidebar.tools')}</span>
                     </button>
                     <button
                         className={`sidebar-nav-btn ${currentPage === 'settings' ? 'active' : ''}`}
                         onClick={onGoToSettings}
                     >
                         <Settings size={16} />
-                        <span>Settings</span>
+                        <span>{t('sidebar.settings')}</span>
                     </button>
                 </div>
 
@@ -646,13 +648,13 @@ export function Sidebar({
                             className="see-more-btn"
                             onClick={() => setShowAllChatsModal(true)}
                         >
-                            <span>See {hiddenChatsCount} more</span>
+                            <span>{t('sidebar.seeMore', { count: hiddenChatsCount })}</span>
                             <ChevronRight size={14} />
                         </button>
                     )}
 
                     {conversations.length === 0 && (
-                        <div className="no-conversations">No conversations yet</div>
+                        <div className="no-conversations">{t('sidebar.noConversations')}</div>
                     )}
                 </div>
 
@@ -674,7 +676,7 @@ export function Sidebar({
                             <button
                                 className="user-profile-btn"
                                 onClick={() => setShowUserMenu(prev => !prev)}
-                                aria-label="User menu"
+                                aria-label={t('sidebar.userMenu')}
                             >
                                 <div className="user-avatar">
                                     {authStatus.anonMode ? (
@@ -700,8 +702,8 @@ export function Sidebar({
                                 <div className="user-info">
                                     <span className="user-name">
                                         {authStatus.anonMode
-                                            ? 'Anonymous Mode'
-                                            : displayName || authStatus.user?.email || 'User'}
+                                            ? t('sidebar.anonymousMode')
+                                            : displayName || authStatus.user?.email || t('sidebar.user')}
                                     </span>
                                     {!authStatus.anonMode && authStatus.user?.email && displayName && (
                                         <span className="user-email">{authStatus.user.email}</span>
@@ -713,29 +715,29 @@ export function Sidebar({
                                 <div className="user-menu" role="menu">
                                     {/* Theme Toggle */}
                                     <div className="user-menu-theme">
-                                        <span className="user-menu-label">Theme</span>
+                                        <span className="user-menu-label">{t('sidebar.theme')}</span>
                                         <div className="theme-toggle-group">
                                             <button
                                                 className={`theme-toggle-btn ${theme === 'light' ? 'active' : ''}`}
                                                 onClick={() => setTheme('light')}
-                                                aria-label="Light theme"
-                                                title="Light"
+                                                aria-label={t('sidebar.lightTheme')}
+                                                title={t('sidebar.themeLight')}
                                             >
                                                 <Sun size={14} />
                                             </button>
                                             <button
                                                 className={`theme-toggle-btn ${theme === 'dark' ? 'active' : ''}`}
                                                 onClick={() => setTheme('dark')}
-                                                aria-label="Dark theme"
-                                                title="Dark"
+                                                aria-label={t('sidebar.darkTheme')}
+                                                title={t('sidebar.themeDark')}
                                             >
                                                 <Moon size={14} />
                                             </button>
                                             <button
                                                 className={`theme-toggle-btn ${theme === 'system' ? 'active' : ''}`}
                                                 onClick={() => setTheme('system')}
-                                                aria-label="System theme"
-                                                title="System"
+                                                aria-label={t('sidebar.systemTheme')}
+                                                title={t('sidebar.themeSystem')}
                                             >
                                                 <Monitor size={14} />
                                             </button>
@@ -758,7 +760,7 @@ export function Sidebar({
                                             role="menuitem"
                                         >
                                             <Gift size={14} />
-                                            <span>What's New</span>
+                                            <span>{t('sidebar.whatsNew')}</span>
                                             <span className="user-menu-version-badge">v{authStatus.version}</span>
                                         </button>
                                     )}
@@ -772,12 +774,12 @@ export function Sidebar({
                                             role="menuitem"
                                         >
                                             <LogOut size={14} />
-                                            <span>Sign out</span>
+                                            <span>{t('sidebar.signOut')}</span>
                                         </button>
                                     )}
                                     {authStatus.anonMode && (
                                         <div className="user-menu-info">
-                                            <span>Using local API keys</span>
+                                            <span>{t('sidebar.usingLocalApiKeys')}</span>
                                         </div>
                                     )}
                                 </div>
@@ -805,11 +807,11 @@ export function Sidebar({
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="chat-modal-header">
-                            <h2>All Chats</h2>
+                            <h2>{t('sidebar.allChats')}</h2>
                             <button
                                 className="chat-modal-close"
                                 onClick={closeModal}
-                                aria-label="Close"
+                                aria-label={t('common.close')}
                             >
                                 <X size={18} />
                             </button>
@@ -820,7 +822,7 @@ export function Sidebar({
                             <input
                                 ref={searchInputRef}
                                 type="text"
-                                placeholder="Search chats..."
+                                placeholder={t('sidebar.searchChats')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyDown={handleModalKeyDown}
@@ -831,7 +833,7 @@ export function Sidebar({
                                 <button
                                     className="search-clear"
                                     onClick={() => { setSearchQuery(''); setSearchResults(null); }}
-                                    aria-label="Clear search"
+                                    aria-label={t('sidebar.clearSearch')}
                                 >
                                     <X size={14} />
                                 </button>
@@ -843,18 +845,18 @@ export function Sidebar({
                                 filteredConversations.map((conv, index) => renderConversationItem(conv, true, index))
                             ) : (
                                 <div className="no-conversations">
-                                    {searchQuery ? 'No chats match your search' : 'No conversations yet'}
+                                    {searchQuery ? t('sidebar.noChatsMatch') : t('sidebar.noConversations')}
                                 </div>
                             )}
                         </div>
 
                         <div className="chat-modal-footer">
                             <span className="chat-count">
-                                {filteredConversations.length} {filteredConversations.length === 1 ? 'chat' : 'chats'}
-                                {searchQuery && searchResults ? ' found' : searchQuery ? ` matching "${searchQuery}"` : ''}
+                                {t('sidebar.chatCount', { count: filteredConversations.length })}
+                                {searchQuery && searchResults ? ` ${t('sidebar.found')}` : searchQuery ? ` ${t('sidebar.matching', { query: searchQuery })}` : ''}
                             </span>
                             <span className="keyboard-hint">
-                                <kbd>↑</kbd><kbd>↓</kbd> navigate · <kbd>Enter</kbd> open · <kbd>{MOD_KEY}O</kbd> toggle · <kbd>Esc</kbd> close
+                                <kbd>↑</kbd><kbd>↓</kbd> {t('sidebar.keyboardHintNavigate')} · <kbd>Enter</kbd> {t('sidebar.keyboardHintOpen')} · <kbd>{MOD_KEY}O</kbd> {t('sidebar.keyboardHintToggle')} · <kbd>Esc</kbd> {t('sidebar.keyboardHintClose')}
                             </span>
                         </div>
                     </div>
@@ -872,11 +874,11 @@ export function Sidebar({
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="chat-modal-header">
-                            <h2>What's New in v{authStatus?.version}</h2>
+                            <h2>{t('sidebar.whatsNewVersion', { version: authStatus?.version })}</h2>
                             <button
                                 className="chat-modal-close"
                                 onClick={() => { setShowChangelog(false); setChangelogNotes(null); }}
-                                aria-label="Close"
+                                aria-label={t('common.close')}
                             >
                                 <X size={18} />
                             </button>
@@ -885,7 +887,7 @@ export function Sidebar({
                             {changelogNotes ? (
                                 <ReactMarkdown>{changelogNotes}</ReactMarkdown>
                             ) : (
-                                <p className="no-conversations">No release notes available for this version.</p>
+                                <p className="no-conversations">{t('sidebar.noReleaseNotes')}</p>
                             )}
                         </div>
                         <div className="changelog-footer">
@@ -893,7 +895,7 @@ export function Sidebar({
                                 href="https://github.com/khoj-ai/pipali/releases"
                                 onClick={(e) => { e.preventDefault(); openInBrowser("https://github.com/khoj-ai/pipali/releases"); }}
                             >
-                                Previous release notes
+                                {t('sidebar.previousReleaseNotes')}
                             </a>
                         </div>
                     </div>

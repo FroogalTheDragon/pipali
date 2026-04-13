@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, CreditCard, X, ExternalLink as ExternalLinkIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '../ExternalLink';
 import type { BillingAlert } from '../../types/billing';
 import { getBillingActionLabel, getBillingTitle } from './billing-messages';
@@ -21,6 +22,7 @@ export function BillingAlertBanner({
     platformFrontendUrl,
     onDismissAll,
 }: BillingAlertBannerProps) {
+    const { t } = useTranslation();
     const latestAlert = alerts[0];
     if (!latestAlert) return null;
 
@@ -40,19 +42,19 @@ export function BillingAlertBanner({
                     <button
                         className="billing-alert-dismiss"
                         onClick={onDismissAll}
-                        aria-label="Dismiss billing alert"
+                        aria-label={t('sidebar.dismissBillingAlert')}
                     >
                         <X size={14} />
                     </button>
                 </div>
                 <p className="billing-alert-message">
                     {isCreditsError
-                        ? 'Add credits to continue using Pipali.'
-                        : 'Increase your spending limit to continue.'}
+                        ? t('billing.addCreditsMessage')
+                        : t('billing.increaseLimitMessage')}
                 </p>
                 {alerts.length > 1 && (
                     <span className="billing-alert-count">
-                        +{alerts.length - 1} more {alerts.length === 2 ? 'task' : 'tasks'} affected
+                        {t('billing.moreTasksAffected', { count: alerts.length - 1 })}
                     </span>
                 )}
                 <ExternalLink

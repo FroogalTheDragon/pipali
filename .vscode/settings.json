@@ -1,3 +1,25 @@
 {
-  "bun.test.filePattern": "tests/**/*.test.ts"
+  "bun.test.filePattern": "tests/**/*.test.ts",
+  "i18n-ally.localesPaths": ["src/client/i18n/locales"],
+  "i18n-ally.keystyle": "nested",
+  "i18n-ally.sourceLanguage": "en",
+  "i18n-ally.keysInUse": [
+    "confirmation.titles.*",
+    "confirmation.options.*",
+    "automations.days.*",
+    "automations.status*",
+    "automations.inDays*",
+    "automations.inHours*",
+    "automations.inMinutes*",
+    "home.greetings.*",
+    "home.timeOfDay.*",
+    "tasks.running",
+    "tasks.needsInput",
+    "tasks.completed",
+    "tasks.stopped",
+    "tasks.pinned",
+    "mcpTools.status*",
+    "billing.insufficientCredits.*",
+    "billing.spendLimit.*"
+  ]
 }

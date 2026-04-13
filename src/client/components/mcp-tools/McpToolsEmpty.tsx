@@ -1,27 +1,29 @@
 // Empty state when no MCP servers are configured
 
 import { Hammer } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface McpToolsEmptyProps {
     onAddServer: () => void;
 }
 
 export function McpToolsEmpty({ onAddServer }: McpToolsEmptyProps) {
+    const { t } = useTranslation();
     return (
         <div className="empty-state mcp-tools-empty">
             <Hammer className="empty-icon" size={32} strokeWidth={1.5} />
-            <h2>No Tools</h2>
-            <p>Connect your apps and services to Pipali.</p>
+            <h2>{t('mcpTools.noToolsTitle')}</h2>
+            <p>{t('mcpTools.noToolsDescription')}</p>
             <p className="empty-hint">
-               Access data, manage tasks, and automate workflows across your apps and services.
+               {t('mcpTools.noToolsHint')}
             </p>
             <ul className="mcp-capabilities">
-                <li>Interact with Slack, Email, Calendar</li>
-                <li>Manage projects on Notion, Linear, Github</li>
-                <li>Access files on Google Drive, Dropbox, OneDrive</li>
+                <li>{t('mcpTools.capabilitySlack')}</li>
+                <li>{t('mcpTools.capabilityProjects')}</li>
+                <li>{t('mcpTools.capabilityFiles')}</li>
             </ul>
             <button className="btn-primary" onClick={onAddServer}>
-                Integrate Your First Tool
+                {t('mcpTools.integrateFirst')}
             </button>
         </div>
     );

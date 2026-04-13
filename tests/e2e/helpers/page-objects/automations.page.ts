@@ -271,11 +271,13 @@ export class AutomationsPage {
     }
 
     /**
-     * Select day of week in edit mode (when frequency is Week)
+     * Select day of week in edit mode (when frequency is Week).
+     * Clicks the toggle button matching the first 3 characters of the day name (e.g. "Fri" for "Friday").
      */
     async selectDayOfWeek(day: string): Promise<void> {
-        const daySelect = this.detailModal.locator(Selectors.frequencySelect).nth(1);
-        await daySelect.selectOption({ label: day });
+        const abbrev = day.slice(0, 3);
+        const dayBtn = this.detailModal.locator(`${Selectors.dayToggle}:text-is("${abbrev}")`);
+        await dayBtn.click();
     }
 
     /**

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { McpServerInfo } from '../../types/mcp';
 import { McpServerCard } from './McpServerCard';
 import { CreateMcpServerModal } from './CreateMcpServerModal';
@@ -8,6 +9,7 @@ import { McpToolsEmpty } from './McpToolsEmpty';
 import { apiFetch } from '../../utils/api';
 
 export function McpToolsPage() {
+    const { t } = useTranslation();
     const [servers, setServers] = useState<McpServerInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isReloading, setIsReloading] = useState(false);
@@ -65,7 +67,7 @@ export function McpToolsPage() {
             <main className="main-content">
                 <div className="messages-container">
                     <div className="mcp-tools-gallery">
-                        <div className="mcp-tools-loading">Loading tools...</div>
+                        <div className="mcp-tools-loading">{t('mcpTools.loading')}</div>
                     </div>
                 </div>
             </main>
@@ -78,7 +80,7 @@ export function McpToolsPage() {
                 <div className="mcp-tools-gallery">
                     <div className="mcp-tools-header">
                         <div className="mcp-tools-header-left">
-                            <h2>Tools</h2>
+                            <h2>{t('mcpTools.title')}</h2>
                             <span className="mcp-tools-count">{servers.length}</span>
                         </div>
                         <div className="mcp-tools-header-actions">
@@ -87,13 +89,13 @@ export function McpToolsPage() {
                                 className="mcp-tools-create-btn"
                             >
                                 <Plus size={16} />
-                                <span>Connect Tool</span>
+                                <span>{t('mcpTools.connectTool')}</span>
                             </button>
                             <button
                                 onClick={handleReload}
                                 className="mcp-tools-refresh-btn"
                                 disabled={isReloading}
-                                title="Reload all servers"
+                                title={t('mcpTools.reloadTooltip')}
                             >
                                 <RefreshCw size={16} className={isReloading ? 'spinning' : ''} />
                             </button>

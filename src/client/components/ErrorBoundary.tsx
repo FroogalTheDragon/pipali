@@ -1,5 +1,6 @@
 import React from 'react';
 import { apiFetch } from '../utils/api';
+import i18n from '../i18n';
 
 interface ErrorBoundaryProps {
     children: React.ReactNode;
@@ -84,27 +85,27 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             return (
                 <div className="error-boundary-container">
                     <div className="error-boundary-content">
-                        <h1 className="error-boundary-title">Something went wrong</h1>
+                        <h1 className="error-boundary-title">{i18n.t('errors.somethingWentWrong')}</h1>
                         <p className="error-boundary-message">
-                            The application encountered an unexpected error. Copy the details below and share them with the developers to help fix this.
+                            {i18n.t('errors.unexpectedError')}
                         </p>
                         <div className="error-boundary-actions">
                             <button
                                 className="error-boundary-copy"
                                 onClick={this.handleCopyError}
                             >
-                                {this.state.copied ? 'Copied!' : 'Copy Error Details'}
+                                {this.state.copied ? i18n.t('errors.copied') : i18n.t('errors.copyErrorDetails')}
                             </button>
                             <button
                                 className="error-boundary-reload"
                                 onClick={this.handleReload}
                             >
-                                Reload
+                                {i18n.t('errors.reload')}
                             </button>
                         </div>
                         {this.state.error && (
                             <details className="error-boundary-details">
-                                <summary className="error-boundary-summary">Error details</summary>
+                                <summary className="error-boundary-summary">{i18n.t('errors.errorDetails')}</summary>
                                 <pre className="error-boundary-stack">
                                     {this.state.error.toString()}
                                     {this.state.error.stack && `\n\n${this.state.error.stack}`}

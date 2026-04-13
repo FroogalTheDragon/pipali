@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Save, Loader2, Check, AlertCircle, Shield, User, FolderLock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { apiFetch } from '../../utils/api';
+import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { PathListEditor } from './PathListEditor';
 
 type SettingsTab = 'profile' | 'permissions';
@@ -51,6 +53,7 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
+    const { t, i18n } = useTranslation();
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
     const [name, setName] = useState('');
     const [location, setLocation] = useState('');
@@ -89,7 +92,7 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
             }
         } catch (e) {
             console.error('Failed to fetch user context', e);
-            setError('Failed to load settings');
+            setError(t('settings.failedToLoad'));
         } finally {
             setIsLoading(false);
         }
@@ -116,7 +119,7 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
             }
         } catch (e) {
             console.error('Failed to fetch sandbox data', e);
-            setSandboxError('Failed to load sandbox settings');
+            setSandboxError(t('settings.failedToLoadSandbox'));
         }
     };
 
@@ -143,12 +146,12 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                 setTimeout(() => setSaveStatus('idle'), 2000);
             } else {
                 const data = await res.json();
-                throw new Error(data.error || 'Failed to save');
+                throw new Error(data.error || t('settings.failedToSave'));
             }
         } catch (e) {
             console.error('Failed to save user context', e);
             setSaveStatus('error');
-            setError(e instanceof Error ? e.message : 'Failed to save settings');
+            setError(e instanceof Error ? e.message : t('settings.failedToSave'));
         }
     };
 
@@ -170,11 +173,11 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                 // Revert on failure
                 setSandboxConfig(prev => prev ? { ...prev, enabled: !enabled } : prev);
                 const data = await res.json();
-                throw new Error(data.error || 'Failed to save');
+                throw new Error(data.error || t('settings.failedToSave'));
             }
         } catch (e) {
             console.error('Failed to toggle sandbox', e);
-            setSandboxError(e instanceof Error ? e.message : 'Failed to toggle sandbox');
+            setSandboxError(e instanceof Error ? e.message : t('settings.failedToToggleSandbox'));
         }
     };
 
@@ -195,12 +198,12 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
             });
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || 'Failed to save');
+                throw new Error(data.error || t('settings.failedToSave'));
             }
         } catch (e) {
             console.error('Failed to save file permissions', e);
             setSandboxConfig(sandboxConfig); // revert
-            setSandboxError(e instanceof Error ? e.message : 'Failed to save file permissions');
+            setSandboxError(e instanceof Error ? e.message : t('settings.failedToSavePermissions'));
         }
     };
 
@@ -209,7 +212,7 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
             <main className="main-content">
                 <div className="messages-container">
                     <div className="settings-page">
-                        <div className="settings-loading">Loading settings...</div>
+                        <div className="settings-loading">{t('settings.loading')}</div>
                     </div>
                 </div>
             </main>
@@ -221,7 +224,7 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
             <div className="messages-container">
                 <div className="settings-page">
                     <div className="settings-header">
-                        <h2>Settings</h2>
+                        <h2>{t('settings.title')}</h2>
                         {sandboxStatus?.supported && (
                             <div className="settings-tabs">
                                 <button
@@ -229,14 +232,14 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                                     onClick={() => setActiveTab('profile')}
                                 >
                                     <User size={16} />
-                                    <span>Profile</span>
+                                    <span>{t('settings.tabProfile')}</span>
                                 </button>
                                 <button
                                     className={`settings-tab ${activeTab === 'permissions' ? 'active' : ''}`}
                                     onClick={() => setActiveTab('permissions')}
                                 >
                                     <Shield size={16} />
-                                    <span>Permissions</span>
+                                    <span>{t('settings.tabPermissions')}</span>
                                 </button>
                             </div>
                         )}
@@ -253,45 +256,73 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                         <div className="settings-section">
                             <h3 className="settings-section-title">
                                 <User size={18} />
-                                About You
+                                {t('settings.aboutYou')}
                             </h3>
                             <p className="settings-section-description">
-                                This information helps Pipali personalize responses and understand your context.
+                                {t('settings.aboutYouDescription')}
                             </p>
 
                             <div className="settings-form">
                                 <div className="settings-field">
-                                    <label htmlFor="name">Name</label>
+                                    <label htmlFor="name">{t('settings.labelName')}</label>
                                     <input
                                         id="name"
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        placeholder="Your name"
+                                        placeholder={t('settings.placeholderName')}
                                     />
                                 </div>
 
                                 <div className="settings-field">
-                                    <label htmlFor="location">Location</label>
+                                    <label htmlFor="location">{t('settings.labelLocation')}</label>
                                     <input
                                         id="location"
                                         type="text"
                                         value={location}
                                         onChange={(e) => setLocation(e.target.value)}
-                                        placeholder="City, Country"
+                                        placeholder={t('settings.placeholderLocation')}
                                     />
                                 </div>
 
+                                {SUPPORTED_LANGUAGES.length > 1 && (
+                                    <div className="settings-field">
+                                        <label htmlFor="language">{t('settings.language')}</label>
+                                        <p className="settings-field-hint">
+                                            {t('settings.languageHint')}
+                                        </p>
+                                        <select
+                                            id="language"
+                                            value={i18n.language.slice(0, 2)}
+                                            onChange={(e) => {
+                                                const lang = e.target.value;
+                                                i18n.changeLanguage(lang);
+                                                apiFetch('/api/user/context', {
+                                                    method: 'PUT',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ language: lang }),
+                                                }).catch(() => {});
+                                            }}
+                                        >
+                                            {SUPPORTED_LANGUAGES.map(lang => (
+                                                <option key={lang.code} value={lang.code}>
+                                                    {lang.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
                                 <div className="settings-field">
-                                    <label htmlFor="instructions">Custom Instructions</label>
+                                    <label htmlFor="instructions">{t('settings.labelInstructions')}</label>
                                     <p className="settings-field-hint">
-                                        Tell Pipali about yourself, your preferences, and how you'd like it to respond.
+                                        {t('settings.instructionsHint')}
                                     </p>
                                     <textarea
                                         id="instructions"
                                         value={instructions}
                                         onChange={(e) => setInstructions(e.target.value)}
-                                        placeholder="Example:&#10;I work as a sales representative. Please explain technical concepts simply.&#10;&#10;Always write new files to my Desktop/Pipali folder.&#10;Do not overwrite my existing files unless I specifically ask."
+                                        placeholder={t('settings.instructionsPlaceholder')}
                                         rows={10}
                                     />
                                 </div>
@@ -305,17 +336,17 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                                         {saveStatus === 'saving' ? (
                                             <>
                                                 <Loader2 size={16} className="spinning" />
-                                                <span>Saving...</span>
+                                                <span>{t('settings.saving')}</span>
                                             </>
                                         ) : saveStatus === 'saved' ? (
                                             <>
                                                 <Check size={16} />
-                                                <span>Saved</span>
+                                                <span>{t('settings.saved')}</span>
                                             </>
                                         ) : (
                                             <>
                                                 <Save size={16} />
-                                                <span>Save Changes</span>
+                                                <span>{t('settings.saveChanges')}</span>
                                             </>
                                         )}
                                     </button>
@@ -339,10 +370,10 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                                 <div>
                                     <h3 className="settings-section-title">
                                         <Shield size={18} />
-                                        Sandbox
+                                        {t('settings.sandbox')}
                                     </h3>
                                     <p className="settings-section-description">
-                                        When enabled, shell commands run in an OS-enforced sandbox without requiring confirmation.
+                                        {t('settings.sandboxDescription')}
                                     </p>
                                 </div>
                                 {sandboxConfig && (
@@ -364,34 +395,34 @@ export function SettingsPage({ onUserContextSaved }: SettingsPageProps) {
                         <div className="settings-section">
                             <h3 className="settings-section-title">
                                 <FolderLock size={18} />
-                                File Permissions
+                                {t('settings.filePermissions')}
                             </h3>
                             <p className="settings-section-description">
-                                Control which files and folders Pipali can read or write without asking.
+                                {t('settings.filePermissionsDescription')}
                             </p>
 
                             <div className="settings-form">
                                 <div className="settings-field">
-                                    <label>Allowed Write Directories</label>
+                                    <label>{t('settings.allowedWriteDirectories')}</label>
                                     <p className="settings-field-hint">
-                                        Never require your confirmation to manage files in these folders.
+                                        {t('settings.allowedWriteHint')}
                                     </p>
                                     <PathListEditor
                                         paths={getUserPaths(sandboxConfig.allowedWritePaths, defaultPaths?.allowedWritePaths ?? [])}
                                         onChange={(paths) => savePaths({ allowedWritePaths: mergeWithDefaults(paths, defaultPaths?.allowedWritePaths ?? []) })}
-                                        placeholder="e.g., Documents/pipali"
+                                        placeholder={t('settings.allowedWritePlaceholder')}
                                     />
                                 </div>
 
                                 <div className="settings-field">
-                                    <label>Protected Read Paths</label>
+                                    <label>{t('settings.protectedReadPaths')}</label>
                                     <p className="settings-field-hint">
-                                        Always require your confirmation to view these files or folders.
+                                        {t('settings.protectedReadHint')}
                                     </p>
                                     <PathListEditor
                                         paths={getUserPaths(sandboxConfig.deniedReadPaths, defaultPaths?.deniedReadPaths ?? [])}
                                         onChange={(paths) => savePaths({ deniedReadPaths: mergeWithDefaults(paths, defaultPaths?.deniedReadPaths ?? []) })}
-                                        placeholder="e.g., Documents/passwords.docx"
+                                        placeholder={t('settings.protectedReadPlaceholder')}
                                         mode="any"
                                     />
                                 </div>
