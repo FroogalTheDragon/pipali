@@ -9,7 +9,7 @@ import { shortenHomePath } from '../../utils/formatting';
 import { apiFetch } from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import i18n from '../../i18n';
+import { formatTime, formatDayOfWeek, formatDayOfMonth } from './utils';
 
 interface AutomationDetailModalProps {
     automation: AutomationInfo;
@@ -118,46 +118,21 @@ function formatSchedule(automation: AutomationInfo, t: TFunction): string {
     const dayOfMonth = parts[2] ?? '*';
     const dayOfWeek = parts[4] ?? '*';
 
-    // Handle hourly schedule
     if (hour === '*') {
         return t('automations.everyHourAt', { minute: minute.padStart(2, '0') });
     }
 
     const hourNum = parseInt(hour, 10);
-    const formatTime = (h: number, m: string) => {
-        const am = t('automations.timePeriodAM');
-        const pm = t('automations.timePeriodPM');
-        if (!am && !pm) return `${h.toString().padStart(2, '0')}:${m.padStart(2, '0')}`;
-        const h12 = h % 12 || 12;
-        return `${h12}:${m.padStart(2, '0')} ${h < 12 ? am : pm}`;
-    };
-    const timeStr = formatTime(hourNum, minute);
+    const timeStr = formatTime(hourNum, minute, t);
 
     if (dayOfMonth === '*' && dayOfWeek === '*') {
         return t('automations.everyDayAt', { time: timeStr });
     }
-
     if (dayOfMonth === '*' && dayOfWeek !== '*') {
-        const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const dayNames = dayOfWeek.split(',').map(d => {
-            const dayKey = dayKeys[parseInt(d.trim(), 10)] ?? 'sunday';
-            return t(`automations.days.${dayKey}`);
-        });
-        const dayStr = dayNames.length > 1
-            ? dayNames.slice(0, -1).join(', ') + ' ' + t('automations.and') + ' ' + dayNames[dayNames.length - 1]
-            : dayNames[0];
-        return t('automations.everyDayOfWeekAt', { day: dayStr, time: timeStr });
+        return t('automations.everyDayOfWeekAt', { day: formatDayOfWeek(dayOfWeek, t), time: timeStr });
     }
-
     if (dayOfMonth !== '*') {
-        const dom = parseInt(dayOfMonth, 10);
-        let dayStr = `${dom}`;
-        if (i18n.language.startsWith('en')) {
-            const suffixes = ['th', 'st', 'nd', 'rd'];
-            const v = dom % 100;
-            dayStr = `${dom}${suffixes[(v >= 11 && v <= 13) ? 0 : Math.min(v % 10, 4) > 3 ? 0 : v % 10]}`;
-        }
-        return t('automations.everyDayOfMonthAt', { day: dayStr, time: timeStr });
+        return t('automations.everyDayOfMonthAt', { day: formatDayOfMonth(parseInt(dayOfMonth, 10)), time: timeStr });
     }
 
     return config.schedule;
