@@ -11,6 +11,16 @@ import { createChildLogger } from '../../logger';
 
 const log = createChildLogger({ component: 'webpage_extractor' });
 
+/**
+ * Truncate overlong raw webpage content to not overwhelm LLM context.
+ */
+export function truncateWebpageContent(content: string, maxLength: number = 10e4, truncationReason: string = 'Content truncated...'): string {
+    if (content.length > maxLength) {
+        return content.slice(0, maxLength) + `\n\n[${truncationReason}]`;
+    }
+    return content;
+}
+
 // System prompt for content extraction
 const EXTRACTION_SYSTEM_PROMPT = `As a professional analyst, your job is to extract all pertinent information from a webpage to help answer a user's query.
 You will be provided raw text from a webpage.
@@ -28,15 +38,15 @@ Adhere to these guidelines while extracting information:
 /**
  * Build the extraction prompt
  */
-function buildExtractionPrompt(webpageContent: string, query: string): string {
+function buildExtractionPrompt(webpageContent: string, query: string, url: string): string {
     // Truncate content if too long (keep within reasonable token limits)
-    const maxContentLength = 30000;
-    let content = webpageContent;
-    if (content.length > maxContentLength) {
-        content = content.slice(0, maxContentLength) + '\n\n[Content truncated due to length...]';
-    }
+    const content = truncateWebpageContent(webpageContent, 10e4, 'Content truncated due to length...');
 
-    return `<target_query>
+    return `<source_url>
+${url}
+</source_url>
+
+<target_query>
 ${query}
 </target_query>
 
@@ -52,12 +62,14 @@ Extract all relevant information from the webpage content to answer the target q
  *
  * @param webpageContent - The raw text content of the webpage
  * @param query - The query/question to extract relevant information for
+ * @param url - The URL of the webpage
  * @param metricsAccumulator - Optional accumulator to track LLM usage metrics
  * @returns Extracted relevant content
  */
 export async function extractRelevantContent(
     webpageContent: string,
     query: string,
+    url: string,
     metricsAccumulator?: MetricsAccumulator
 ): Promise<string> {
     if (!webpageContent || webpageContent.trim().length === 0) {
@@ -65,17 +77,13 @@ export async function extractRelevantContent(
     }
 
     if (!query || query.trim().length === 0) {
-        // If no query, return truncated raw content
-        const maxLength = 5000;
-        if (webpageContent.length <= maxLength) {
-            return webpageContent;
-        }
-        return webpageContent.slice(0, maxLength) + '\n\n[Content truncated...]';
+        // If no query, return (truncated) raw content
+        return truncateWebpageContent(webpageContent);
     }
 
     try {
         // Build the extraction prompt
-        const extractionPrompt = buildExtractionPrompt(webpageContent, query);
+        const extractionPrompt = buildExtractionPrompt(webpageContent, query, url);
 
         log.debug(`Extracting content for query: "${query.slice(0, 50)}..."`);
 
@@ -88,7 +96,8 @@ export async function extractRelevantContent(
 
         if (!response || !response.message) {
             log.warn('No response from model');
-            return webpageContent.slice(0, 5000) + (webpageContent.length > 5000 ? '\n\n[Content truncated...]' : '');
+            // Fallback to return raw (truncated) content on model failure
+            return truncateWebpageContent(webpageContent);
         }
 
         // Accumulate usage metrics if accumulator provided
@@ -105,7 +114,7 @@ export async function extractRelevantContent(
         const errorMessage = error instanceof Error ? error.message : String(error);
         log.error({ err: error }, `Extraction failed: ${errorMessage}`);
 
-        // Fallback to truncated raw content on error
-        return webpageContent.slice(0, 5000) + (webpageContent.length > 5000 ? '\n\n[Content truncated...]' : '');
+        // Fallback to return raw (truncated) content on error
+        return truncateWebpageContent(webpageContent);
     }
 }
