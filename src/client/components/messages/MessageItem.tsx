@@ -71,7 +71,7 @@ export function MessageItem({ message, platformFrontendUrl, onDelete, onBillingC
                 <div className="message-content">
                     <ReactMarkdown
                         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
-                        rehypePlugins={[rehypeKatex]}
+                        rehypePlugins={[[rehypeKatex, { output: 'mathml' }]]}
                         urlTransform={safeMarkdownUrlTransform}
                         components={{
                             a: ExternalLink,
