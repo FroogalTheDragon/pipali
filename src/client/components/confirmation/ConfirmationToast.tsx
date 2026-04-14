@@ -6,6 +6,7 @@ import type { PendingConfirmation } from '../../types/confirmation';
 import { DiffView } from '../tool-views/DiffView';
 import { shortenHomePath, parseMcpToolName, cleanOperationType } from '../../utils/formatting';
 import { getButtonClass, formatTimeRemaining, hasExpandableContent, getMessagePreview, getOperationTypePillClass, HIDDEN_MCP_ARGS, formatArgValue } from './utils';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmationToastProps {
     confirmation: PendingConfirmation;
@@ -22,6 +23,7 @@ export function ConfirmationToast({
     onNavigateToConversation,
     onNavigateToAutomations,
 }: ConfirmationToastProps) {
+    const { t } = useTranslation();
     const [isExpanded, setIsExpanded] = useState(false);
     const [guidanceText, setGuidanceText] = useState('');
 
@@ -97,9 +99,9 @@ export function ConfirmationToast({
                     <div className="toast-title-row">
                         <span className={`toast-title ${isAgentQuestion ? 'agent-question-title' : ''}`}>
                             {isAgentQuestion && <MessageCircleQuestion size={12} className="question-icon" />}
-                            {mcpToolInfo?.friendlyName || request.title}
+                            {mcpToolInfo?.friendlyName || t(`confirmation.titles.${request.operation}`, { defaultValue: request.title })}
                         </span>
-                        {isAgentQuestion && <span className="question-badge">Question</span>}
+                        {isAgentQuestion && <span className="question-badge">{t('confirmation.question')}</span>}
                         {displayOpType && (
                             <span className={getOperationTypePillClass(displayOpType)}>
                                 {displayOpType}
@@ -127,7 +129,7 @@ export function ConfirmationToast({
                         <button
                             className="toast-expand-btn"
                             onClick={() => setIsExpanded(!isExpanded)}
-                            title={isExpanded ? 'Collapse' : 'Expand'}
+                            title={isExpanded ? t('confirmation.collapse') : t('confirmation.expand')}
                         >
                             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </button>
@@ -137,7 +139,7 @@ export function ConfirmationToast({
                     <button
                         className="toast-close-btn"
                         onClick={() => onDismiss(key)}
-                        title="Dismiss"
+                        title={t('common.dismiss')}
                     >
                         <X size={14} />
                     </button>
@@ -151,7 +153,7 @@ export function ConfirmationToast({
                     {commandInfo?.command && (
                         <div className="toast-command-section">
                             <div className="toast-command-header">
-                                <span className="toast-command-label">Command</span>
+                                <span className="toast-command-label">{t('confirmation.command')}</span>
                                 {commandInfo.workdir && (
                                     <code className="toast-workdir">
                                         in {shortenHomePath(commandInfo.workdir)}
@@ -201,7 +203,7 @@ export function ConfirmationToast({
                         onClick={() => onRespond(key, option.id)}
                         title={option.description}
                     >
-                        {option.label}
+                        {t(`confirmation.options.${option.id}`, { defaultValue: option.label })}
                     </button>
                 ))}
             </div>
@@ -212,7 +214,7 @@ export function ConfirmationToast({
                     <input
                         type="text"
                         className="toast-guidance-input"
-                        placeholder={isAgentQuestion ? "Or type a custom response..." : "Or provide alternative instructions..."}
+                        placeholder={isAgentQuestion ? t('confirmation.guidancePlaceholderQuestion') : t('confirmation.guidancePlaceholderDefault')}
                         value={guidanceText}
                         onChange={(e) => setGuidanceText(e.target.value)}
                         onKeyDown={(e) => {
@@ -225,7 +227,7 @@ export function ConfirmationToast({
                         className="toast-btn toast-guidance-send"
                         onClick={handleSendGuidance}
                         disabled={!guidanceText.trim()}
-                        title="Send guidance (declines current operation)"
+                        title={t('confirmation.sendGuidance')}
                     >
                         <Send size={14} />
                     </button>

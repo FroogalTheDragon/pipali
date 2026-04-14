@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { apiFetch } from '../../utils/api';
 
 interface CreateSkillModalProps {
@@ -10,6 +11,7 @@ interface CreateSkillModalProps {
 }
 
 export function CreateSkillModal({ onClose, onCreated }: CreateSkillModalProps) {
+    const { t } = useTranslation();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [instructions, setInstructions] = useState('');
@@ -37,10 +39,10 @@ export function CreateSkillModal({ onClose, onCreated }: CreateSkillModalProps) 
                 onCreated();
             } else {
                 const data = await res.json();
-                setError(data.error || 'Failed to create skill');
+                setError(data.error || t('skills.failedToCreate'));
             }
         } catch (e) {
-            setError('Failed to create skill');
+            setError(t('skills.failedToCreate'));
         } finally {
             setIsCreating(false);
         }
@@ -56,7 +58,7 @@ export function CreateSkillModal({ onClose, onCreated }: CreateSkillModalProps) 
         <div className="modal-backdrop" onClick={handleBackdropClick}>
             <div className="modal skill-modal">
                 <div className="modal-header">
-                    <h2>Create Skill</h2>
+                    <h2>{t('skills.createSkill')}</h2>
                     <button onClick={onClose} className="modal-close">
                         <X size={18} />
                     </button>
@@ -64,34 +66,34 @@ export function CreateSkillModal({ onClose, onCreated }: CreateSkillModalProps) 
 
                 <form onSubmit={handleSubmit} className="skill-form">
                     <div className="form-group">
-                        <label htmlFor="skill-name">Name</label>
+                        <label htmlFor="skill-name">{t('skills.name')}</label>
                         <input
                             id="skill-name"
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                            placeholder="my-skill"
+                            placeholder={t('skills.namePlaceholder')}
                         />
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="skill-description">Description</label>
+                        <label htmlFor="skill-description">{t('skills.description')}</label>
                         <input
                             id="skill-description"
                             type="text"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Describe what the skill does and when it should be used"
+                            placeholder={t('skills.descriptionPlaceholder')}
                         />
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="skill-instructions">Instructions</label>
+                        <label htmlFor="skill-instructions">{t('skills.instructions')}</label>
                         <textarea
                             id="skill-instructions"
                             value={instructions}
                             onChange={(e) => setInstructions(e.target.value)}
-                            placeholder="Detailed instructions for how to use this skill..."
+                            placeholder={t('skills.instructionsPlaceholder')}
                             rows={6}
                         />
                     </div>
@@ -100,16 +102,16 @@ export function CreateSkillModal({ onClose, onCreated }: CreateSkillModalProps) 
 
                     <div className="modal-actions">
                         <button type="button" onClick={onClose} className="btn-secondary">
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button type="submit" disabled={!canSubmit} className="btn-primary">
                             {isCreating ? (
                                 <>
                                     <Loader2 size={16} className="spinning" />
-                                    <span>Creating...</span>
+                                    <span>{t('skills.creating')}</span>
                                 </>
                             ) : (
-                                'Create Skill'
+                                t('skills.createSkill')
                             )}
                         </button>
                     </div>

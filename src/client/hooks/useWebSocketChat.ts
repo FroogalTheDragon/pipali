@@ -628,6 +628,13 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
             const finalizeMessages = (msgs: Message[]): Message[] => {
                 const filteredMsgs = msgs.filter(msg => !msg.billingInfo);
+
+                // Silent completion (e.g. research terminated by repeated warnings) —
+                // no final assistant message to show, just clean up streaming state
+                if (!response) {
+                    return dropEmptyStreamingPlaceholders(stopAllStreamingAssistants(filteredMsgs), runId);
+                }
+
                 const idx = findRunAssistantIndex(filteredMsgs, runId);
                 if (idx === -1) {
                     // Idempotency: observe replay or reconnects can deliver RUN_COMPLETE multiple times.

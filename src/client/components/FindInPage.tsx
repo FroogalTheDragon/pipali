@@ -1,6 +1,7 @@
 // Find in page component with Cmd/Ctrl+F support
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface FindInPageProps {
@@ -17,6 +18,7 @@ interface MatchInfo {
 }
 
 export function FindInPage({ isOpen, onClose, containerSelector = '.main-content', initialQuery }: FindInPageProps) {
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [matches, setMatches] = useState<MatchInfo[]>([]);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
@@ -241,7 +243,7 @@ export function FindInPage({ isOpen, onClose, containerSelector = '.main-content
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Find in page..."
+                    placeholder={t('findInPage.placeholder')}
                     className="find-input"
                     autoComplete="off"
                     spellCheck={false}
@@ -249,8 +251,8 @@ export function FindInPage({ isOpen, onClose, containerSelector = '.main-content
                 {query && (
                     <span className="find-count">
                         {matches.length > 0
-                            ? `${currentMatchIndex + 1} of ${matches.length}`
-                            : 'No results'}
+                            ? t('findInPage.matchCount', { current: currentMatchIndex + 1, total: matches.length })
+                            : t('findInPage.noResults')}
                     </span>
                 )}
             </div>
@@ -259,8 +261,8 @@ export function FindInPage({ isOpen, onClose, containerSelector = '.main-content
                     onClick={goToPreviousMatch}
                     disabled={matches.length === 0}
                     className="find-nav-button"
-                    title="Previous match (Shift+Enter)"
-                    aria-label="Previous match"
+                    title={t('findInPage.previousMatch')}
+                    aria-label={t('findInPage.previousMatchLabel')}
                 >
                     <ChevronUp size={18} />
                 </button>
@@ -268,16 +270,16 @@ export function FindInPage({ isOpen, onClose, containerSelector = '.main-content
                     onClick={goToNextMatch}
                     disabled={matches.length === 0}
                     className="find-nav-button"
-                    title="Next match (Enter)"
-                    aria-label="Next match"
+                    title={t('findInPage.nextMatch')}
+                    aria-label={t('findInPage.nextMatchLabel')}
                 >
                     <ChevronDown size={18} />
                 </button>
                 <button
                     onClick={onClose}
                     className="find-close-button"
-                    title="Close (Escape)"
-                    aria-label="Close find bar"
+                    title={t('findInPage.closeFind')}
+                    aria-label={t('findInPage.closeFindLabel')}
                 >
                     <X size={18} />
                 </button>

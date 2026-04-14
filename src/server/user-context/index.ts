@@ -15,12 +15,14 @@ const log = createChildLogger({ component: 'user-context' });
 export interface UserContext {
     name?: string;
     location?: string;
+    language?: string;
     instructions?: string;
 }
 
 interface UserContextFrontmatter {
     name?: string;
     location?: string;
+    language?: string;
 }
 
 /**
@@ -60,6 +62,12 @@ function parseFrontmatter(content: string): UserContextFrontmatter | null {
         result.location = locationMatch[1].trim();
     }
 
+    // Parse language field
+    const languageMatch = yaml.match(/^language:\s*["']?([^"'\n]+?)["']?\s*$/m);
+    if (languageMatch && languageMatch[1]) {
+        result.language = languageMatch[1].trim();
+    }
+
     return result;
 }
 
@@ -95,6 +103,7 @@ export async function loadUserContext(): Promise<UserContext> {
         return {
             name: frontmatter?.name,
             location: frontmatter?.location,
+            language: frontmatter?.language,
             instructions: instructions || undefined,
         };
     } catch (err) {
@@ -120,6 +129,9 @@ export async function saveUserContext(ctx: UserContext): Promise<void> {
     }
     if (ctx.location) {
         lines.push(`location: ${ctx.location}`);
+    }
+    if (ctx.language) {
+        lines.push(`language: ${ctx.language}`);
     }
     lines.push('---');
     lines.push('');

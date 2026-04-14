@@ -169,6 +169,8 @@ export const Selectors = {
     instructionsTextarea: '.instructions-textarea',
     frequencySelect: '.frequency-select',
     frequencySelector: '.frequency-selector',
+    dayToggleGroup: '.day-toggle-group',
+    dayToggle: '.day-toggle',
 
     // Automation Confirmation Section
     automationConfirmationSection: '.automation-confirmation-section',

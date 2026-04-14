@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { apiFetch, getApiBaseUrl } from '../../utils/api';
 import { isDesktopMode, openInBrowser } from '../../utils/tauri';
 
@@ -13,6 +14,7 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
+    const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
     const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             }
         } catch (err) {
             console.error('Google sign-in error:', err);
-            setError('Failed to start Google sign-in. Please try again.');
+            setError(t('auth.googleSignInError'));
             setIsLoading(false);
         }
     };
@@ -129,7 +131,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             }
         } catch (err) {
             console.error('Email sign-in error:', err);
-            setError('Failed to start sign-in. Please try again.');
+            setError(t('auth.emailSignInError'));
             setIsLoading(false);
         }
     };
@@ -141,15 +143,15 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 <div className="login-card">
                     <div className="login-header">
                         <div className="login-logo">
-                            <img src={logoUrl} alt="Pipali" width="64" height="64" />
+                            <img src={logoUrl} alt={t('common.pipali')} width="64" height="64" />
                         </div>
-                        <h1>Complete sign in</h1>
-                        <p>Finish signing in using your browser, then return here.</p>
+                        <h1>{t('auth.completeSignIn')}</h1>
+                        <p>{t('auth.finishSignInBrowser')}</p>
                     </div>
 
                     <div className="login-waiting">
                         <Loader2 size={32} className="spinning" />
-                        <p>Waiting for authentication...</p>
+                        <p>{t('auth.waitingForAuth')}</p>
                     </div>
 
                     <div className="login-buttons">
@@ -157,7 +159,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                             className="login-btn secondary"
                             onClick={() => setIsWaitingForAuth(false)}
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                     </div>
                 </div>
@@ -170,10 +172,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             <div className="login-card">
                 <div className="login-header">
                     <div className="login-logo">
-                        <img src={logoUrl} alt="Pipali" width="64" height="64" />
+                        <img src={logoUrl} alt={t('common.pipali')} width="64" height="64" />
                     </div>
-                    <h1>Welcome to Pipali</h1>
-                    <p>Sign in to continue to your personal AI assistant</p>
+                    <h1>{t('auth.welcome')}</h1>
+                    <p>{t('auth.signInToContinue')}</p>
                 </div>
 
                 {error && (
@@ -211,13 +213,13 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                                     />
                                 </svg>
                             )}
-                            <span>Continue with Google</span>
+                            <span>{t('auth.continueWithGoogle')}</span>
                         </button>
                     )}
 
                     {authCapabilities?.googleEnabled && authCapabilities?.emailEnabled && (
                         <div className="login-divider">
-                            <span>or</span>
+                            <span>{t('common.or')}</span>
                         </div>
                     )}
 
@@ -235,14 +237,14 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                                     <path d="M22 7l-10 6L2 7" />
                                 </svg>
                             )}
-                            <span>Continue with Email</span>
+                            <span>{t('auth.continueWithEmail')}</span>
                         </button>
                     )}
                 </div>
 
                 <div className="login-footer">
                     <p>
-                        By continuing, you agree to Pipali's Terms of Service and Privacy Policy.
+                        {t('auth.termsNotice')}
                     </p>
                 </div>
             </div>

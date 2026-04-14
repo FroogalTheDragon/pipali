@@ -1,7 +1,9 @@
 /// <reference lib="dom" />
 /// <reference lib="dom.iterable" />
 
+import './i18n';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useTranslation } from 'react-i18next';
 import { createRoot } from "react-dom/client";
 import "katex/dist/katex.min.css";
 
@@ -46,6 +48,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 type PageType = 'home' | 'chat' | 'skills' | 'automations' | 'mcp-tools' | 'settings';
 
 const App = () => {
+    const { t } = useTranslation();
+
     // Sidecar configuration (for Tauri desktop app)
     const { baseUrl, wsBaseUrl } = useSidecar();
 
@@ -607,7 +611,7 @@ const App = () => {
                             // New confirmation - send OS notification with conversation ID for navigation
                             notifyConfirmationRequest(
                                 confirmation.request,
-                                confirmation.automationName || 'Routine',
+                                confirmation.automationName || t('tasks.routine'),
                                 confirmation.conversationId ?? undefined
                             );
                         }
@@ -865,7 +869,7 @@ const App = () => {
             })
             .catch((e) => {
                 console.error('Failed to copy conversation', e);
-                alert(e instanceof Error ? e.message : 'Failed to copy conversation');
+                alert(e instanceof Error ? e.message : t('errors.failedToCopy'));
                 return new Blob([''], { type: 'text/plain' });
             })
             .finally(() => setCopyingConversationId(null));
@@ -888,7 +892,7 @@ const App = () => {
             })
             .catch((e) => {
                 console.error('Failed to copy conversation', e);
-                alert(e instanceof Error ? e.message : 'Failed to copy conversation');
+                alert(e instanceof Error ? e.message : t('errors.failedToCopy'));
                 return new Blob([''], { type: 'text/plain' });
             })
             .finally(() => setCopyingConversationId(null));
@@ -966,7 +970,7 @@ const App = () => {
                 // Get latest user message from conversation messages or title
                 const latestUserMessage = state.messages
                     .filter(m => m.role === 'user')
-                    .pop()?.content || conv?.title || 'New task';
+                    .pop()?.content || conv?.title || t('tasks.newTask');
 
                 // Find the latest assistant message (streaming or finalized)
                 const assistantMsg = state.messages.findLast(m => m.role === 'assistant');
@@ -1006,7 +1010,7 @@ const App = () => {
             if (conv.isPinned && !activeIds.has(conv.id)) {
                 activeTasks.push({
                     conversationId: conv.id,
-                    title: conv.title || 'Untitled',
+                    title: conv.title || t('tasks.untitled'),
                     reasoning: conv.preview || undefined,
                     status: 'pinned',
                     isPinned: true,
@@ -1201,6 +1205,26 @@ const App = () => {
         }
     };
 
+    // ===== Billing Actions =====
+
+    const handleBillingDismiss = (messageId: string) => {
+        const next = messages.filter(m => m.id !== messageId);
+        setChatMessages(next);
+        if (conversationId) syncConversationState(conversationId, next);
+    };
+
+    const handleBillingContinue = (messageId: string) => {
+        // Remove the billing message and send a continue message to resume the task
+        handleBillingDismiss(messageId);
+        if (!conversationId || !isConnected) return;
+        const clientMessageId = generateUUID();
+        const runId = generateUUID();
+        const continueMessage = t('common.continue');
+        addOptimisticUserMessage({ id: clientMessageId, stableId: clientMessageId, role: 'user', content: continueMessage }, conversationId);
+        startOptimisticRun(conversationId, runId, clientMessageId);
+        sendWsMessage(continueMessage, conversationId, { clientMessageId, runId, optimistic: false });
+    };
+
     // ===== Message Sending =====
 
     const sendConfirmationResponse = (convId: string, requestId: string, optionId: string, guidance?: string) => {
@@ -1253,7 +1277,7 @@ const App = () => {
         // Flatten the queue: for each conversation, take all confirmations in the queue
         for (const [convId, queue] of pendingConfirmations.entries()) {
             const conv = conversations.find(c => c.id === convId);
-            const convTitle = conv?.title || 'Background Task';
+            const convTitle = conv?.title || t('tasks.backgroundTask');
             for (const item of queue) {
                 chatConfirmations.push(toChatConfirmation(convId, item.request, convTitle));
             }
@@ -1299,7 +1323,7 @@ const App = () => {
 
         // Allow sending with only files (no text)
         if (!messageText && hasFiles) {
-            messageText = 'Please look at the attached files.';
+            messageText = t('messages.pleaseLookAtFiles');
         }
         if (!messageText) return;
 
@@ -1356,7 +1380,7 @@ const App = () => {
         const hasFiles = stagedFiles.length > 0;
 
         if (!userMsg && hasFiles) {
-            userMsg = 'Please look at the attached files.';
+            userMsg = t('messages.pleaseLookAtFiles');
         }
         if (!userMsg) return;
 
@@ -1478,7 +1502,7 @@ const App = () => {
                     )}
                     {currentPage === 'chat' && (
                         <ErrorBoundary>
-                            <MessageList messages={messages} conversationId={conversationId} platformFrontendUrl={platformFrontendUrl} onDeleteMessage={deleteMessage} userFirstName={userName?.split(' ')[0] ?? authStatus?.user?.name?.split(' ')[0]} />
+                            <MessageList messages={messages} conversationId={conversationId} platformFrontendUrl={platformFrontendUrl} onDeleteMessage={deleteMessage} onBillingContinue={handleBillingContinue} onBillingDismiss={handleBillingDismiss} userFirstName={userName?.split(' ')[0] ?? authStatus?.user?.name?.split(' ')[0]} />
                         </ErrorBoundary>
                     )}
 

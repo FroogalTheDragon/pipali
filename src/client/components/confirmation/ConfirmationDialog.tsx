@@ -10,6 +10,7 @@ import { shortenHomePath, parseMcpToolName, cleanOperationType } from '../../uti
 import { getOperationTypePillClass, HIDDEN_MCP_ARGS, formatArgValue } from './utils';
 
 import { ALT_KEY } from '../../utils/platform';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmationDialogProps {
     request: ConfirmationRequest;
@@ -17,6 +18,7 @@ interface ConfirmationDialogProps {
 }
 
 export function ConfirmationDialog({ request, onRespond }: ConfirmationDialogProps) {
+    const { t } = useTranslation();
     const isAgentQuestion = request.operation === 'ask_user';
 
     // Handle keyboard shortcuts (Alt+1, Alt+2, etc. to select options)
@@ -72,11 +74,11 @@ export function ConfirmationDialog({ request, onRespond }: ConfirmationDialogPro
                 <div className="confirmation-header">
                     <h3 className={`confirmation-title ${isAgentQuestion ? 'agent-question-title' : ''}`}>
                         {isAgentQuestion && <MessageCircleQuestion size={14} className="question-icon" />}
-                        {isMcpToolCall && mcpToolInfo ? mcpToolInfo.friendlyName : request.title}
+                        {mcpToolInfo?.friendlyName || t(`confirmation.titles.${request.operation}`, { defaultValue: request.title })}
                     </h3>
                     <div className="confirmation-badges">
                         {isAgentQuestion && (
-                            <span className="question-badge">Question</span>
+                            <span className="question-badge">{t('confirmation.question')}</span>
                         )}
                         {displayOpType && (
                             <span className={getOperationTypePillClass(displayOpType)}>
@@ -114,10 +116,10 @@ export function ConfirmationDialog({ request, onRespond }: ConfirmationDialogPro
                                 {commandInfo.command && (
                                     <div className="command-section">
                                         <div className="command-section-header">
-                                            <span className="command-section-label">Command</span>
+                                            <span className="command-section-label">{t('confirmation.command')}</span>
                                             {commandInfo.workdir && (
                                                 <code className="workdir-pill" title={commandInfo.workdir}>
-                                                    in {shortenHomePath(commandInfo.workdir)}
+                                                    {t('confirmation.in')} {shortenHomePath(commandInfo.workdir)}
                                                 </code>
                                             )}
                                         </div>
@@ -141,7 +143,7 @@ export function ConfirmationDialog({ request, onRespond }: ConfirmationDialogPro
                         {/* Affected files fallback */}
                         {!request.diff && !request.message && !commandInfo && request.context?.affectedFiles && request.context.affectedFiles.length > 0 && (
                             <div className="confirmation-files">
-                                <span className="files-label">Affected files:</span>
+                                <span className="files-label">{t('confirmation.affectedFiles')}</span>
                                 <ul className="files-list">
                                     {request.context.affectedFiles.map((file, idx) => (
                                         <li key={idx} className="file-item">{file}</li>
@@ -162,7 +164,7 @@ export function ConfirmationDialog({ request, onRespond }: ConfirmationDialogPro
                             title={`${option.description || option.label} (${ALT_KEY}${index + 1})`}
                         >
                             <span className="btn-shortcut">{index + 1}</span>
-                            {option.label}
+                            {t(`confirmation.options.${option.id}`, { defaultValue: option.label })}
                         </button>
                     ))}
                 </div>

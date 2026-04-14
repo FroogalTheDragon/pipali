@@ -170,10 +170,11 @@ describe('readWebpage', () => {
     test('should truncate very long content', async () => {
         delete process.env.EXA_API_KEY;
 
-        const longContent = 'A'.repeat(100000);
+        const maxContentLength = 10e4; // 100,000 characters
+        const overlongContent = 'A'.repeat(11e4);
         fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
             new Response(
-                `<html><body><p>${longContent}</p></body></html>`,
+                `<html><body><p>${overlongContent}</p></body></html>`,
                 {
                     status: 200,
                     headers: { 'Content-Type': 'text/html' },
@@ -183,8 +184,8 @@ describe('readWebpage', () => {
 
         const result = await readWebpage({ url: 'https://example.com' });
 
-        // Content should be truncated (raw content limit is 50000, extracted is 10000 without query)
-        expect(result.compiled.length).toBeLessThan(60000);
+        // Content should be truncated (raw content and extracted content without query limit is 10e4 characters)
+        expect(result.compiled.length).toBeLessThan(maxContentLength + 100); // Allow some buffer for additional text
         expect(result.compiled).toContain('truncated');
     });
 

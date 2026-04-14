@@ -6,6 +6,7 @@
 
 import { isTauri } from './tauri';
 import type { ConfirmationRequest } from '../../server/processor/confirmation/confirmation.types';
+import i18n from '../i18n';
 
 let notificationPermissionGranted: boolean | null = null;
 
@@ -207,8 +208,8 @@ export async function notifyConfirmationRequest(
 
     // Build notification content
     const title = request.operation === 'ask_user'
-        ? 'Question from Pipali'
-        : 'Action Required';
+        ? i18n.t('notifications.questionFromPipali')
+        : i18n.t('notifications.actionRequired');
 
     const body = conversationTitle
         ? `${conversationTitle}: ${request.title}`
@@ -250,11 +251,11 @@ export async function notifyTaskComplete(
     // Build notification content
     const title = userRequest
         ? truncate(userRequest, 50)
-        : 'Task Complete';
+        : i18n.t('notifications.taskComplete');
 
     const body = responseSnippet
         ? truncate(responseSnippet, 100)
-        : 'Your task has finished';
+        : i18n.t('notifications.taskFinished');
 
     if (isTauri()) {
         await sendTauriNotification(title, body, conversationId);

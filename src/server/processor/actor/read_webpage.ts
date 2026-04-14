@@ -8,7 +8,7 @@
 
 import { platformFetch } from '../../http/platform-fetch';
 import { getPlatformUrl } from '../../auth';
-import { extractRelevantContent } from './webpage_extractor';
+import { extractRelevantContent, truncateWebpageContent } from './webpage_extractor';
 import type { MetricsAccumulator } from '../director/types';
 import { isInternalUrl, getInternalUrlReason } from '../../security';
 import {
@@ -176,12 +176,8 @@ function htmlToText(html: string): string {
     text = text.replace(/\n\s*\n/g, '\n\n');
     text = text.trim();
 
-    // Limit length to avoid overwhelming the context
-    const maxLength = 50000;
-    if (text.length > maxLength) {
-        text = text.slice(0, maxLength) + '\n\n[Content truncated...]';
-    }
-
+    // Truncate overlong content to avoid overwhelming the context
+    text = truncateWebpageContent(text);
     return text;
 }
 
@@ -303,26 +299,18 @@ export async function readWebpage(
         // Platform already extracts relevant content server-side.
         // For direct fetch, use LLM extraction if a query is provided.
         let extractedContent: string;
-        if (query && !usedPlatform) {
+        if (!usedPlatform) {
             try {
                 log.debug(`Extracting relevant content for query: "${query}"`);
-                extractedContent = await extractRelevantContent(rawContent, query, opts.metricsAccumulator);
+                extractedContent = await extractRelevantContent(rawContent, query ?? '', url, opts.metricsAccumulator);
                 log.debug(`Extracted ${extractedContent.length} chars of relevant content`);
             } catch (error) {
                 log.warn(`Content extraction failed, using raw content: ${error}`);
-                // Fallback to truncated raw content if extraction fails
-                extractedContent = rawContent.slice(0, 10000);
-                if (rawContent.length > 10000) {
-                    extractedContent += '\n\n[Content truncated...]';
-                }
-            }
-        } else {
-            // No query provided, use truncated raw content
-            extractedContent = rawContent.slice(0, 10000);
-            if (rawContent.length > 10000) {
-                extractedContent += '\n\n[Content truncated...]';
             }
         }
+
+        // Fallback to truncated raw content if extraction fails
+        extractedContent ??= truncateWebpageContent(rawContent);
 
         return {
             query: `**Reading webpage**: ${url}`,

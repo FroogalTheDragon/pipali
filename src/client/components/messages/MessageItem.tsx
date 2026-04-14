@@ -1,6 +1,7 @@
 // Individual message component
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -18,9 +19,12 @@ interface MessageItemProps {
     message: Message;
     platformFrontendUrl?: string;
     onDelete?: (messageId: string, role: 'user' | 'assistant') => void;
+    onBillingContinue?: (messageId: string) => void;
+    onBillingDismiss?: (messageId: string) => void;
 }
 
-export function MessageItem({ message, platformFrontendUrl, onDelete }: MessageItemProps) {
+export function MessageItem({ message, platformFrontendUrl, onDelete, onBillingContinue, onBillingDismiss }: MessageItemProps) {
+    const { t } = useTranslation();
     const isUser = message.role === 'user';
     const [isHovered, setIsHovered] = useState(false);
 
@@ -34,6 +38,8 @@ export function MessageItem({ message, platformFrontendUrl, onDelete }: MessageI
                     code={message.billingInfo.code}
                     message={message.billingInfo.message}
                     platformFrontendUrl={platformFrontendUrl}
+                    onContinue={onBillingContinue ? () => onBillingContinue(message.id) : undefined}
+                    onDismiss={onBillingDismiss ? () => onBillingDismiss(message.id) : undefined}
                 />
             </div>
         );
@@ -50,7 +56,7 @@ export function MessageItem({ message, platformFrontendUrl, onDelete }: MessageI
                     <button
                         className="message-action-btn"
                         onClick={() => onDelete(message.id, message.role)}
-                        title="Delete message"
+                        title={t('messages.deleteMessage')}
                     >
                         <Trash2 size={14} />
                     </button>
@@ -67,7 +73,7 @@ export function MessageItem({ message, platformFrontendUrl, onDelete }: MessageI
                 <div className="message-content">
                     <ReactMarkdown
                         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
-                        rehypePlugins={[rehypeKatex]}
+                        rehypePlugins={[[rehypeKatex, { output: 'mathml' }]]}
                         urlTransform={safeMarkdownUrlTransform}
                         components={{
                             a: ExternalLink,

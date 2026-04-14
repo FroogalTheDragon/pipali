@@ -1,6 +1,7 @@
 // App header with sidebar toggle and logo
 
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getApiBaseUrl } from '../../utils/api';
 
 interface HeaderProps {
@@ -14,6 +15,7 @@ export function Header({
     onToggleSidebar,
     onGoHome,
 }: HeaderProps) {
+    const { t } = useTranslation();
     return (
         <header className="header">
             <div className="header-content">
@@ -36,8 +38,8 @@ export function Header({
                             }
                         }}
                     >
-                        <img src={`${getApiBaseUrl()}/icons/pipali_64.png`} alt="Pipali" className="logo-icon" />
-                        <span className="logo-text">Pipali</span>
+                        <img src={`${getApiBaseUrl()}/icons/pipali_64.png`} alt={t('common.pipali')} className="logo-icon" />
+                        <span className="logo-text">{t('common.pipali')}</span>
                     </div>
                 </div>
             </div>

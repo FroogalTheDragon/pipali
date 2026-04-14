@@ -117,12 +117,34 @@ export async function initializeSandbox(): Promise<void> {
 }
 
 /**
+ * Initialize sandbox with a given config, bypassing the database.
+ * Used in integration tests where the DB is not available.
+ */
+export async function initializeSandboxWithConfig(config: SandboxConfig): Promise<void> {
+    currentConfig = config;
+    if (!isSandboxSupported() || !config.enabled) {
+        initialized = true;
+        return;
+    }
+    try {
+        process.env.CLAUDE_TMPDIR = '/tmp/pipali';
+        const runtimeConfig = buildRuntimeConfig(config);
+        await SandboxManager.initialize(runtimeConfig);
+        initialized = true;
+    } catch (error) {
+        log.error({ err: error }, 'Failed to initialize sandbox with config');
+        initialized = true;
+    }
+}
+
+/**
  * Shutdown the sandbox runtime.
  * Should be called on server shutdown.
  */
 export async function shutdownSandbox(): Promise<void> {
     try {
         await SandboxManager.reset();
+        initialized = false;
         log.info('Sandbox shutdown complete');
     } catch (error) {
         log.error({ err: error }, 'Error during sandbox shutdown');
@@ -199,7 +221,14 @@ export async function wrapCommandWithSandbox(command: string): Promise<string> {
 
         log.debug({ command: command.substring(0, 100) }, 'Command wrapped with sandbox');
 
-        return sandboxedCommand;
+        // Fix shell-quote over-escaping: when the command contains single quotes,
+        // shell-quote falls back to double-quote wrapping and escapes ! to \!
+        // (for interactive bash history expansion). But sandbox-exec runs bash -c
+        // non-interactively, so history expansion is disabled and the backslash
+        // leaks through as a literal character, breaking scripts (e.g. Python's !=).
+        // This is safe: ! is the only char where shell-quote's escaping diverges
+        // from non-interactive bash behavior (\$ and \` are correctly consumed).
+        return sandboxedCommand.replace(/\\!/g, '!');
     } catch (error) {
         log.error({ err: error }, 'Failed to wrap command with sandbox');
         // Return original command on error
