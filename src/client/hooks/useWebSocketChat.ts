@@ -194,6 +194,12 @@ function persistConversationStatesToStorage(conversationStates: Map<string, Conv
             const shouldPersist = state.isProcessing || state.isStopped || state.isCompleted;
             if (!shouldPersist) continue;
 
+            // Strip isQueued: a reload can't tell whether the server still has the message
+            // queued. RUN_STARTED will reinstate the placeholder if/when the run begins.
+            const persistedMessages = state.messages
+                .slice(-MAX_PERSISTED_MESSAGES_PER_CONVERSATION)
+                .map(m => (m.isQueued ? { ...m, isQueued: false } : m));
+
             entries.push([
                 conversationId,
                 {
@@ -201,7 +207,7 @@ function persistConversationStatesToStorage(conversationStates: Map<string, Conv
                     isStopped: state.isStopped,
                     isCompleted: state.isCompleted,
                     latestReasoning: state.latestReasoning,
-                    messages: state.messages.slice(-MAX_PERSISTED_MESSAGES_PER_CONVERSATION),
+                    messages: persistedMessages,
                 },
             ]);
         }
@@ -389,6 +395,22 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             const targetConversationId = conversationId ?? state.conversationId;
             const isCurrentConversation = targetConversationId === state.conversationId || (state.conversationId === undefined && !conversationId);
 
+            // Soft interrupt: a second streaming placeholder while one is already in flight
+            // produces two competing 3-dot animations. Flag the user message as queued instead.
+            const targetState = targetConversationId ? state.conversationStates.get(targetConversationId) : undefined;
+            const isSoftInterrupt = isCurrentConversation
+                ? state.runStatus === 'running'
+                : !!targetState?.isProcessing;
+
+            const markUserQueued = (msgs: Message[]): Message[] => {
+                return msgs.map(m => {
+                    if (m.role === 'user' && (m.id === clientMessageId || m.stableId === clientMessageId)) {
+                        return { ...m, isQueued: true };
+                    }
+                    return m;
+                });
+            };
+
             const insertAssistant = (msgs: Message[]): Message[] => {
                 if (findRunAssistantIndex(msgs, runId) !== -1) return msgs;
                 const assistant: Message = {
@@ -405,7 +427,8 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                     : [...msgs.slice(0, userIndex + 1), assistant, ...msgs.slice(userIndex + 1)];
             };
 
-            const nextMessages = isCurrentConversation ? insertAssistant(state.messages) : state.messages;
+            const transform = isSoftInterrupt ? markUserQueued : insertAssistant;
+            const nextMessages = isCurrentConversation ? transform(state.messages) : state.messages;
 
             const conversationStates = new Map(state.conversationStates);
             if (targetConversationId) {
@@ -416,7 +439,7 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                     isStopped: false,
                     isCompleted: false,
                     latestReasoning: existing?.latestReasoning,
-                    messages: isCurrentConversation ? nextMessages : insertAssistant(baseMessages),
+                    messages: isCurrentConversation ? nextMessages : transform(baseMessages),
                 });
             }
 
@@ -530,9 +553,19 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 };
 
                 const userIndex = messages.findIndex(m => m.role === 'user' && (m.id === clientMessageId || m.stableId === clientMessageId));
-                messages = userIndex === -1
-                    ? [...messages, assistant]
-                    : [...messages.slice(0, userIndex + 1), assistant, ...messages.slice(userIndex + 1)];
+                if (userIndex === -1) {
+                    messages = [...messages, assistant];
+                } else {
+                    // Clear any queued flag — the run for this user message has actually started.
+                    const userMsg = messages[userIndex]!;
+                    const clearedUser = userMsg.isQueued ? { ...userMsg, isQueued: false } : userMsg;
+                    messages = [
+                        ...messages.slice(0, userIndex),
+                        clearedUser,
+                        assistant,
+                        ...messages.slice(userIndex + 1),
+                    ];
+                }
             }
 
             conversationStates.set(conversationId, {
@@ -577,8 +610,14 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 });
             };
 
+            const clearQueuedFlags = (msgs: Message[]): Message[] => {
+                return msgs.map(m => (m.isQueued ? { ...m, isQueued: false } : m));
+            };
+
             const finalizeStopped = (msgs: Message[]): Message[] => {
-                const interrupted = markInterrupted(msgs);
+                // Clear isQueued for any reason: user_stop drops the queue, error/disconnect
+                // leave it in an unknown state. RUN_STARTED will reinstate if the server picks up.
+                const interrupted = clearQueuedFlags(markInterrupted(msgs));
                 // For user_stop, drop orphaned optimistic placeholders from queued messages
                 // that were cleared by the server. These are empty streaming assistants
                 // that will never receive a run_started from the server.

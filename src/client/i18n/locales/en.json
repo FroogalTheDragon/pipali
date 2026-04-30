@@ -509,6 +509,7 @@
     },
     "messages": {
         "deleteMessage": "Delete message",
-        "pleaseLookAtFiles": "Please look at the attached files."
+        "pleaseLookAtFiles": "Please look at the attached files.",
+        "queued": "Queued"
     }
 }

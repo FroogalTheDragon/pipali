@@ -509,6 +509,7 @@
     },
     "messages": {
         "deleteMessage": "Supprimer le message",
-        "pleaseLookAtFiles": "Consulte les fichiers joints."
+        "pleaseLookAtFiles": "Consulte les fichiers joints.",
+        "queued": "En file d'attente"
     }
 }

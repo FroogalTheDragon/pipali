@@ -509,6 +509,7 @@
     },
     "messages": {
         "deleteMessage": "Nachricht löschen",
-        "pleaseLookAtFiles": "Bitte schau dir die angehängten Dateien an."
+        "pleaseLookAtFiles": "Bitte schau dir die angehängten Dateien an.",
+        "queued": "In Warteschlange"
     }
 }

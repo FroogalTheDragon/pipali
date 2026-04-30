@@ -509,6 +509,7 @@
     },
     "messages": {
         "deleteMessage": "メッセージを削除",
-        "pleaseLookAtFiles": "添付ファイルを確認してください。"
+        "pleaseLookAtFiles": "添付ファイルを確認してください。",
+        "queued": "キュー待ち"
     }
 }

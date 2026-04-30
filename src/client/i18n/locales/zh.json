@@ -509,6 +509,7 @@
     },
     "messages": {
         "deleteMessage": "删除消息",
-        "pleaseLookAtFiles": "请查看附件。"
+        "pleaseLookAtFiles": "请查看附件。",
+        "queued": "排队中"
     }
 }
