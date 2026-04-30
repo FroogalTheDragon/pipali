@@ -157,7 +157,8 @@
         "backgroundTask": "后台任务",
         "untitled": "无标题",
         "routine": "例行任务",
-        "activeTasks": "活跃任务",
+        "activeTasks": "任务",
+        "clearFinished": "清除已结束",
         "taskCount_one": "{{count}} 个任务",
         "taskCount_other": "{{count}} 个任务"
     },

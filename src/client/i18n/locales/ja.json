@@ -157,7 +157,8 @@
         "backgroundTask": "バックグラウンドタスク",
         "untitled": "無題",
         "routine": "ルーティン",
-        "activeTasks": "進行中のタスク",
+        "activeTasks": "タスク",
+        "clearFinished": "終了したタスクを消去",
         "taskCount_one": "{{count}}件のタスク",
         "taskCount_other": "{{count}}件のタスク"
     },

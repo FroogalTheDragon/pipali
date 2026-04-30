@@ -157,7 +157,8 @@
         "backgroundTask": "T\u00e2che en arri\u00e8re-plan",
         "untitled": "Sans titre",
         "routine": "Routine",
-        "activeTasks": "Tâches actives",
+        "activeTasks": "Tâches",
+        "clearFinished": "Effacer les tâches terminées",
         "taskCount_one": "{{count}} tâche",
         "taskCount_other": "{{count}} tâches"
     },

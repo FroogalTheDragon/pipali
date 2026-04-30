@@ -637,7 +637,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                 conversationStates.set(conversationId, {
                     ...existing,
                     isProcessing: false,
-                    isStopped: reason === 'user_stop',
+                    // Only involuntary stops surface on home, and only if the user wasn't
+                    // viewing it. User-initiated stop acks can arrive after the user has
+                    // navigated home — exclude them outright to avoid a late re-surface.
+                    isStopped: (reason === 'disconnect' || reason === 'error') && !isCurrentConversation,
                     isCompleted: false,
                     messages: finalizeStopped(existing.messages),
                 });
@@ -724,7 +727,9 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                     ...existing,
                     isProcessing: false,
                     isStopped: false,
-                    isCompleted: true,
+                    // If the user is viewing this conversation when it completes,
+                    // they've already seen the result — skip the home-page card.
+                    isCompleted: !isCurrentConversation,
                     messages: finalizeMessages(existing.messages),
                 });
             }

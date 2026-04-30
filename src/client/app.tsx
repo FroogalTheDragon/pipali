@@ -1520,6 +1520,12 @@ const App = () => {
                         <HomePage
                             activeTasks={getActiveTasks()}
                             onSelectTask={selectConversation}
+                            onClearFinished={() => {
+                                for (const task of getActiveTasks()) {
+                                    if (task.status === 'completed') clearCompleted(task.conversationId);
+                                    else if (task.status === 'stopped') clearStopped(task.conversationId);
+                                }
+                            }}
                             userFirstName={userName?.split(' ')[0] ?? authStatus?.user?.name?.split(' ')[0]}
                             hasInput={input.trim().length > 0}
                         />

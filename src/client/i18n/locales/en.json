@@ -157,7 +157,8 @@
         "backgroundTask": "Background Task",
         "untitled": "Untitled",
         "routine": "Routine",
-        "activeTasks": "Active Tasks",
+        "activeTasks": "Tasks",
+        "clearFinished": "Clear finished",
         "taskCount_one": "{{count}} task",
         "taskCount_other": "{{count}} tasks"
     },
