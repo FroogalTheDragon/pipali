@@ -76,7 +76,12 @@
         "noModelsAvailable": "Keine Modelle verfügbar",
         "selectModel": "Modell auswählen",
         "sendMessage": "Nachricht senden (sanfte Unterbrechung)",
-        "stop": "Stoppen (Esc)"
+        "stop": "Stoppen (Esc)",
+        "tierFlagship": "Flaggschiff",
+        "tierBalanced": "Ausgewogen",
+        "tierLite": "Leicht",
+        "tierOther": "Sonstige",
+        "recommended": "Empfohlen"
     },
     "home": {
         "greetings": {

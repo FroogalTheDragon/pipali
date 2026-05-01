@@ -76,7 +76,12 @@
         "noModelsAvailable": "利用可能なモデルがありません",
         "selectModel": "モデルを選択",
         "sendMessage": "メッセージを送信（ソフト割り込み）",
-        "stop": "停止 (Esc)"
+        "stop": "停止 (Esc)",
+        "tierFlagship": "フラッグシップ",
+        "tierBalanced": "バランス",
+        "tierLite": "ライト",
+        "tierOther": "その他",
+        "recommended": "おすすめ"
     },
     "home": {
         "greetings": {

@@ -441,6 +441,10 @@ api.get('/models', async (c) => {
         visionEnabled: ChatModel.visionEnabled,
         inputCostPerMillion: ChatModel.inputCostPerMillion,
         outputCostPerMillion: ChatModel.outputCostPerMillion,
+        tier: ChatModel.tier,
+        tagline: ChatModel.tagline,
+        costTier: ChatModel.costTier,
+        recommended: ChatModel.recommended,
     })
     .from(ChatModel)
     .leftJoin(AiModelApi, eq(ChatModel.aiModelApiId, AiModelApi.id));

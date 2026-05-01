@@ -76,7 +76,12 @@
         "noModelsAvailable": "没有可用的模型",
         "selectModel": "选择模型",
         "sendMessage": "发送消息（软中断）",
-        "stop": "停止 (Esc)"
+        "stop": "停止 (Esc)",
+        "tierFlagship": "旗舰",
+        "tierBalanced": "均衡",
+        "tierLite": "轻量",
+        "tierOther": "其他",
+        "recommended": "推荐"
     },
     "home": {
         "greetings": {

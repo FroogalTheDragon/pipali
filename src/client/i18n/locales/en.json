@@ -76,7 +76,12 @@
         "noModelsAvailable": "No models available",
         "selectModel": "Select model",
         "sendMessage": "Send message (soft interrupt)",
-        "stop": "Stop (Esc)"
+        "stop": "Stop (Esc)",
+        "tierFlagship": "Flagship",
+        "tierBalanced": "Balanced",
+        "tierLite": "Lite",
+        "tierOther": "Other",
+        "recommended": "Recommended"
     },
     "home": {
         "greetings": {
