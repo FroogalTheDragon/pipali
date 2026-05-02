@@ -18,6 +18,7 @@ import type {
     AuthStatus,
     BillingAlert,
     ChatModelInfo,
+    ConfirmationResponseAttachment,
 } from "./types";
 import type { PendingConfirmation } from "./types/confirmation";
 
@@ -766,11 +767,23 @@ const App = () => {
         }
     };
 
-    const respondToAutomationConfirmation = async (confirmationId: string, optionId: string, guidance?: string) => {
+    const respondToAutomationConfirmation = async (
+        confirmationId: string,
+        optionId: string,
+        guidance?: string,
+        attachments?: ConfirmationResponseAttachment[]
+    ) => {
         try {
-            const body: { selectedOptionId: string; guidance?: string } = { selectedOptionId: optionId };
+            const body: {
+                selectedOptionId: string;
+                guidance?: string;
+                attachments?: ConfirmationResponseAttachment[];
+            } = { selectedOptionId: optionId };
             if (guidance) {
                 body.guidance = guidance;
+            }
+            if (attachments && attachments.length > 0) {
+                body.attachments = attachments;
             }
             const res = await apiFetch(`/api/automations/confirmations/${confirmationId}/respond`, {
                 method: 'POST',
@@ -1333,11 +1346,25 @@ const App = () => {
 
     // ===== Message Sending =====
 
-    const sendConfirmationResponse = (convId: string, requestId: string, optionId: string, guidance?: string) => {
+    const getStagedConfirmationAttachments = (): ConfirmationResponseAttachment[] | undefined => {
+        if (stagedFiles.length === 0) return undefined;
+        return stagedFiles.map(file => ({
+            path: file.filePath,
+            name: file.fileName,
+        }));
+    };
+
+    const sendConfirmationResponse = (
+        convId: string,
+        requestId: string,
+        optionId: string,
+        guidance?: string,
+        attachments?: ConfirmationResponseAttachment[]
+    ) => {
         const queue = pendingConfirmations.get(convId);
         const pendingConfirmation = queue?.find(c => c.request.requestId === requestId);
         if (!pendingConfirmation || !isConnected) return;
-        respondToConfirmation(convId, pendingConfirmation.runId, requestId, optionId, guidance);
+        respondToConfirmation(convId, pendingConfirmation.runId, requestId, optionId, guidance, attachments);
     };
 
     const sendCurrentConfirmationResponse = (optionId: string, guidance?: string) => {
@@ -1345,13 +1372,33 @@ const App = () => {
         // Check chat confirmations first
         const pending = pendingConfirmations.get(conversationId)?.[0];
         if (pending) {
-            sendConfirmationResponse(conversationId, pending.request.requestId, optionId, guidance);
+            const attachments = (optionId === 'guidance' || pending.request.operation === 'ask_user')
+                ? getStagedConfirmationAttachments()
+                : undefined;
+            const effectiveGuidance = optionId === 'guidance'
+                && attachments
+                && attachments.length > 0
+                && !guidance?.trim()
+                ? t('messages.pleaseLookAtFiles')
+                : guidance;
+            sendConfirmationResponse(conversationId, pending.request.requestId, optionId, effectiveGuidance, attachments);
+            if (attachments && attachments.length > 0) clearFiles();
             return;
         }
         // Check automation confirmations for this conversation
         const autoConfirmation = automationConfirmations.find(c => c.conversationId === conversationId);
         if (autoConfirmation) {
-            respondToAutomationConfirmation(autoConfirmation.id, optionId, guidance);
+            const attachments = optionId === 'guidance'
+                ? getStagedConfirmationAttachments()
+                : undefined;
+            const effectiveGuidance = optionId === 'guidance'
+                && attachments
+                && attachments.length > 0
+                && !guidance?.trim()
+                ? t('messages.pleaseLookAtFiles')
+                : guidance;
+            respondToAutomationConfirmation(autoConfirmation.id, optionId, effectiveGuidance, attachments);
+            if (attachments && attachments.length > 0) clearFiles();
         }
     };
 

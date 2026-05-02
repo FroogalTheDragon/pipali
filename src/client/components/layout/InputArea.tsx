@@ -131,9 +131,9 @@ export function InputArea({
                 <form onSubmit={(e) => {
                     // When confirmation is pending, send as guidance instead of new message
                     // This handles mobile where users tap the send button instead of pressing Enter
-                    if (pendingConfirmation && input.trim()) {
+                    if (pendingConfirmation && (input.trim() || hasFiles)) {
                         e.preventDefault();
-                        onConfirmationRespond('guidance', input.trim());
+                        onConfirmationRespond('guidance', input.trim() || undefined);
                         onInputChange('');
                         return;
                     }
@@ -183,9 +183,9 @@ export function InputArea({
                         }}
                         onKeyDown={(e) => {
                             // When confirmation is pending, Enter sends guidance
-                            if (pendingConfirmation && e.key === 'Enter' && !e.shiftKey && input.trim()) {
+                            if (pendingConfirmation && e.key === 'Enter' && !e.shiftKey && (input.trim() || hasFiles)) {
                                 e.preventDefault();
-                                onConfirmationRespond('guidance', input.trim());
+                                onConfirmationRespond('guidance', input.trim() || undefined);
                                 onInputChange('');
                                 return;
                             }

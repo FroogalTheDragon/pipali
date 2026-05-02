@@ -17,7 +17,7 @@
  */
 
 import { useReducer, useRef, useCallback, useEffect } from 'react';
-import type { Message, Thought, ConversationState, ConfirmationRequest, BillingError, AuthError } from '../types';
+import type { Message, Thought, ConversationState, ConfirmationRequest, ConfirmationResponseAttachment, BillingError, AuthError } from '../types';
 import { acquireWakeLock, releaseWakeLock } from '../utils/tauri';
 import { formatToolCallsForSidebar, generateUUID, generateDeterministicId } from '../utils/formatting';
 import { trimHistoryTailAfterUser, mergeHistoryWithLive } from '../utils/chat-messages';
@@ -1663,7 +1663,8 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         runId: string,
         requestId: string,
         optionId: string,
-        guidance?: string
+        guidance?: string,
+        attachments?: ConfirmationResponseAttachment[]
     ) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
@@ -1677,6 +1678,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
                 requestId,
                 selectedOptionId: optionId,
                 guidance,
+                ...(attachments && attachments.length > 0 ? { attachments } : {}),
                 timestamp: new Date().toISOString(),
             },
         }));
