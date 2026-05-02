@@ -17,6 +17,7 @@ import type {
     ActiveTask,
     AuthStatus,
     BillingAlert,
+    ChatModelInfo,
 } from "./types";
 import type { PendingConfirmation } from "./types/confirmation";
 
@@ -46,6 +47,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Page types
 type PageType = 'home' | 'chat' | 'skills' | 'automations' | 'mcp-tools' | 'settings';
+type ConversationModelId = number | null;
 
 const App = () => {
     const { t } = useTranslation();
@@ -126,14 +128,17 @@ const App = () => {
     const authStatusRetryCountRef = useRef(0);
     const historyLoadedConversationIdRef = useRef<string | null>(null);
     const awaitingConversationIdRef = useRef(false);
-    const pendingNewConversationMessagesRef = useRef<Array<{ clientMessageId: string; runId: string; message: string }>>([]);
+    const pendingNewConversationMessagesRef = useRef<Array<{ clientMessageId: string; runId: string; message: string; chatModelId?: number }>>([]);
     // Track pending confirmations for window-shown navigation (avoids stale closure)
     const pendingConfirmationsRef = useRef<Map<string, { runId: string; request: ConfirmationRequest }[]>>(new Map());
     const automationConfirmationsRef = useRef<AutomationPendingConfirmation[]>([]);
     const conversationsRef = useRef<ConversationSummary[]>([]);
     const conversationStatesRef = useRef<Map<string, ConversationState>>(new Map());
-    const conversationModelIds = useRef<Map<string, number>>(new Map());
+    const conversationModelIds = useRef<Map<string, ConversationModelId>>(new Map());
+    const conversationModelChangeSeq = useRef<Map<string, number>>(new Map());
     const messagesRef = useRef<Message[]>([]);
+    const modelsRef = useRef<ChatModelInfo[]>([]);
+    const defaultModelRef = useRef<ChatModelInfo | null>(null);
     // Track isConnected for callbacks that may close over stale state
     const isConnectedRef = useRef(false);
     // When on home page, observe active conversations so confirmations and live state
@@ -150,7 +155,7 @@ const App = () => {
 
     // Hooks
     const { textareaRef, scheduleTextareaFocus } = useFocusManagement();
-    const { models, selectedModel, setSelectedModel, selectModel, showModelDropdown, setShowModelDropdown, refetchModels } = useModels();
+    const { models, defaultModel, selectedModel, setSelectedModel, selectModel, showModelDropdown, setShowModelDropdown, refetchModels } = useModels();
     const { isDragging, stagedFiles, uploadFiles, pickAndStageFiles, removeFile, clearFiles, formatAttachedFilesMessage } = useFileDrop();
     const wsUrl = `${wsBaseUrl}/ws/chat`;
 
@@ -185,8 +190,9 @@ const App = () => {
         shouldActivateConversationOnCreate: () => pendingBackgroundMessageRef.current === null,
         onConversationCreated: (newConversationId) => {
             // Cache the current model for this new conversation
-            if (newConversationId && selectedModel) {
-                conversationModelIds.current.set(newConversationId, selectedModel.id);
+            const modelForNewConversation = selectedModel ?? defaultModelRef.current;
+            if (newConversationId && modelForNewConversation) {
+                conversationModelIds.current.set(newConversationId, modelForNewConversation.id);
             }
             // Refresh list so sidebar picks up new conversations quickly.
             fetchConversations();
@@ -293,6 +299,54 @@ const App = () => {
             }
         },
     });
+
+    const syncSelectedModelForConversation = useCallback((id: string | undefined) => {
+        if (!id) {
+            setSelectedModel(defaultModelRef.current);
+            return;
+        }
+
+        if (!conversationModelIds.current.has(id)) {
+            setSelectedModel(null);
+            return;
+        }
+
+        const modelId = conversationModelIds.current.get(id);
+        const model = modelId === null
+            ? defaultModelRef.current
+            : modelsRef.current.find(m => m.id === modelId) ?? null;
+        setSelectedModel(model);
+    }, [setSelectedModel]);
+
+    const getChatModelIdForRun = useCallback((id: string | undefined) => {
+        if (!id) return selectedModel?.id ?? defaultModelRef.current?.id;
+        if (!conversationModelIds.current.has(id)) return selectedModel?.id;
+        const modelId = conversationModelIds.current.get(id);
+        return modelId === null ? defaultModelRef.current?.id : modelId;
+    }, [selectedModel]);
+
+    const cacheConversationModelFromServer = useCallback((
+        id: string,
+        chatModelId: ConversationModelId,
+        changeSeqAtRequest: number,
+    ) => {
+        const currentSeq = conversationModelChangeSeq.current.get(id) ?? 0;
+        if (currentSeq !== changeSeqAtRequest) return false;
+        conversationModelIds.current.set(id, chatModelId);
+        return true;
+    }, []);
+
+    useEffect(() => {
+        modelsRef.current = models;
+    }, [models]);
+
+    useEffect(() => {
+        defaultModelRef.current = defaultModel;
+    }, [defaultModel]);
+
+    useEffect(() => {
+        syncSelectedModelForConversation(conversationId);
+    }, [conversationId, models, defaultModel, syncSelectedModelForConversation]);
 
     useEffect(() => {
         conversationStatesRef.current = conversationStates;
@@ -457,13 +511,14 @@ const App = () => {
                 setCurrentPage('chat');
                 conversationIdRef.current = undefined;
                 clearConversation();
+                syncSelectedModelForConversation(undefined);
                 scheduleTextareaFocus();
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [scheduleTextareaFocus]);
+    }, [scheduleTextareaFocus, syncSelectedModelForConversation]);
 
     // Focus textarea on various state changes
     useEffect(() => { scheduleTextareaFocus(); }, [conversationId]);
@@ -613,10 +668,20 @@ const App = () => {
 
     const fetchConversations = async () => {
         try {
+            const modelSeqAtRequest = new Map(conversationModelChangeSeq.current);
             const res = await apiFetch('/api/conversations');
             if (res.ok) {
                 const data = await res.json();
-                setConversations(data.conversations);
+                const nextConversations = data.conversations as ConversationSummary[];
+                for (const conversation of nextConversations) {
+                    cacheConversationModelFromServer(
+                        conversation.id,
+                        conversation.chatModelId ?? null,
+                        modelSeqAtRequest.get(conversation.id) ?? 0,
+                    );
+                }
+                setConversations(nextConversations);
+                syncSelectedModelForConversation(conversationIdRef.current);
             }
         } catch (e) {
             console.error("Failed to fetch conversations", e);
@@ -732,6 +797,7 @@ const App = () => {
 
     const fetchHistory = async (id: string) => {
         try {
+            const modelSeqAtRequest = conversationModelChangeSeq.current.get(id) ?? 0;
             historyLoadedConversationIdRef.current = null;
             const res = await apiFetch(`/api/chat/${id}/history`);
             if (!res.ok) return;
@@ -858,12 +924,10 @@ const App = () => {
             historyLoadedConversationIdRef.current = id;
 
             // Sync model dropdown to conversation's model and cache it
-            if (data.chatModelId) {
-                conversationModelIds.current.set(id, data.chatModelId);
-                const conversationModel = models.find(m => m.id === data.chatModelId);
-                if (conversationModel) {
-                    setSelectedModel(conversationModel);
-                }
+            const chatModelId = typeof data.chatModelId === 'number' ? data.chatModelId : null;
+            const appliedModel = cacheConversationModelFromServer(id, chatModelId, modelSeqAtRequest);
+            if (appliedModel && conversationIdRef.current === id) {
+                syncSelectedModelForConversation(id);
             }
 
             // Check if there's a pending query to send after history loaded
@@ -933,14 +997,15 @@ const App = () => {
         if (!pendingQuery) return;
         // Use ref to avoid stale closure when called from async fetchHistory
         if (!isConnectedRef.current) return;
+        const chatModelId = getChatModelIdForRun(conversationId);
 
         pendingQueryAfterHistoryRef.current = null;
         setCurrentPage('chat');
         setChatConversationId(conversationId);
         clearConfirmations(conversationId);
 
-        sendWsMessage(pendingQuery, conversationId);
-    }, [sendWsMessage, setChatConversationId, clearConfirmations]);
+        sendWsMessage(pendingQuery, conversationId, { chatModelId });
+    }, [sendWsMessage, setChatConversationId, clearConfirmations, getChatModelIdForRun]);
 
     useEffect(() => {
         if (!isConnected) return;
@@ -980,6 +1045,7 @@ const App = () => {
                 clientMessageId: qm.clientMessageId,
                 runId: qm.runId,
                 optimistic: false,
+                chatModelId: qm.chatModelId,
             });
         }
     }, [conversationId, sendWsMessage]);
@@ -1126,11 +1192,7 @@ const App = () => {
         }
 
         // Sync model dropdown from cached model ID immediately; history fetch will reconcile.
-        const cachedModelId = conversationModelIds.current.get(id);
-        if (cachedModelId) {
-            const conversationModel = models.find(m => m.id === cachedModelId);
-            if (conversationModel) setSelectedModel(conversationModel);
-        }
+        syncSelectedModelForConversation(id);
     };
 
     const startNewConversation = () => {
@@ -1140,6 +1202,7 @@ const App = () => {
 
         setCurrentPage('chat');
         clearConversation();
+        syncSelectedModelForConversation(undefined);
     };
 
     const renameConversation = async (id: string, title: string): Promise<boolean> => {
@@ -1247,9 +1310,10 @@ const App = () => {
         const clientMessageId = generateUUID();
         const runId = generateUUID();
         const continueMessage = t('common.continue');
+        const chatModelId = getChatModelIdForRun(conversationId);
         addOptimisticUserMessage({ id: clientMessageId, stableId: clientMessageId, role: 'user', content: continueMessage }, conversationId);
         startOptimisticRun(conversationId, runId, clientMessageId);
-        sendWsMessage(continueMessage, conversationId, { clientMessageId, runId, optimistic: false });
+        sendWsMessage(continueMessage, conversationId, { clientMessageId, runId, optimistic: false, chatModelId });
     };
 
     // ===== Auth Actions =====
@@ -1383,13 +1447,14 @@ const App = () => {
         const runId = generateUUID();
         // Show only the user's typed text in the UI (not the <attached_files> block)
         const userMsg: Message = { id: clientMessageId, stableId: clientMessageId, role: 'user', content: messageText, attachedFiles: fileNames };
+        const chatModelId = getChatModelIdForRun(conversationId);
 
         setCurrentPage('chat');
 
         if (!conversationId && awaitingConversationIdRef.current) {
             addOptimisticUserMessage(userMsg);
             startOptimisticRun(undefined, runId, clientMessageId);
-            pendingNewConversationMessagesRef.current.push({ clientMessageId, runId, message: fullMessage });
+            pendingNewConversationMessagesRef.current.push({ clientMessageId, runId, message: fullMessage, chatModelId });
             scheduleTextareaFocus();
             return;
         }
@@ -1400,7 +1465,7 @@ const App = () => {
         // Add optimistic user message with clean text, then send full message to server
         addOptimisticUserMessage(userMsg, conversationId);
         startOptimisticRun(conversationId, runId, clientMessageId);
-        sendWsMessage(fullMessage, conversationId, { clientMessageId, runId, optimistic: false });
+        sendWsMessage(fullMessage, conversationId, { clientMessageId, runId, optimistic: false, chatModelId });
         scheduleTextareaFocus();
     };
 
@@ -1436,14 +1501,15 @@ const App = () => {
         const clientMessageId = generateUUID();
         const runId = generateUUID();
         pendingBackgroundMessageRef.current = { message: fullMessage, clientMessageId, runId };
+        const chatModelId = getChatModelIdForRun(conversationId);
 
         // If we have a conversationId, fork it (includes chat history)
         // Otherwise, create a new conversation from scratch
         if (conversationId) {
-            fork(fullMessage, conversationId, { clientMessageId, runId });
+            fork(fullMessage, conversationId, { clientMessageId, runId, chatModelId });
         } else {
             // No conversationId - create new conversation from scratch
-            sendWsMessage(fullMessage, undefined, { clientMessageId, runId, optimistic: false });
+            sendWsMessage(fullMessage, undefined, { clientMessageId, runId, optimistic: false, chatModelId });
         }
 
         scheduleTextareaFocus();
@@ -1581,14 +1647,31 @@ const App = () => {
                         showModelDropdown={showModelDropdown}
                         setShowModelDropdown={setShowModelDropdown}
                         onSelectModel={(model) => {
-                            selectModel(model);
                             if (conversationId) {
-                                conversationModelIds.current.set(conversationId, model.id);
-                                apiFetch(`/api/conversations/${conversationId}/model`, {
+                                const targetConversationId = conversationId;
+                                const pickSeq = (conversationModelChangeSeq.current.get(targetConversationId) ?? 0) + 1;
+                                conversationModelChangeSeq.current.set(targetConversationId, pickSeq);
+                                setSelectedModel(model);
+                                setShowModelDropdown(false);
+                                conversationModelIds.current.set(targetConversationId, model.id);
+                                setConversations(prev => prev.map(c => c.id === targetConversationId ? { ...c, chatModelId: model.id } : c));
+                                apiFetch(`/api/conversations/${targetConversationId}/model`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ chatModelId: model.id }),
+                                }).then(res => {
+                                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                }).catch((e) => {
+                                    console.error("Failed to update conversation model", e);
+                                    if (conversationModelChangeSeq.current.get(targetConversationId) !== pickSeq) return;
+                                    if (conversationIdRef.current === targetConversationId) {
+                                        void fetchHistory(targetConversationId);
+                                    } else {
+                                        void fetchConversations();
+                                    }
                                 });
+                            } else {
+                                selectModel(model);
                             }
                         }}
                     />

@@ -83,6 +83,7 @@ export interface SendMessageOptions {
     clientMessageId?: string;
     runId?: string;
     optimistic?: boolean;
+    chatModelId?: number;
 }
 
 export interface StopOptions {
@@ -1623,6 +1624,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
             type: 'message',
             message: content,
             conversationId,
+            ...(options?.chatModelId !== undefined ? { chatModelId: options.chatModelId } : {}),
             clientMessageId,
             runId,
         }));
@@ -1680,7 +1682,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
         }));
     }, []);
 
-    const fork = useCallback((message: string, sourceConversationId: string, options?: { clientMessageId?: string; runId?: string }) => {
+    const fork = useCallback((message: string, sourceConversationId: string, options?: { clientMessageId?: string; runId?: string; chatModelId?: number }) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
         const clientMessageId = options?.clientMessageId ?? generateUUID();
@@ -1690,6 +1692,7 @@ export function useWebSocketChat(options: UseWebSocketChatOptions) {
             type: 'fork',
             message,
             sourceConversationId,
+            ...(options?.chatModelId !== undefined ? { chatModelId: options.chatModelId } : {}),
             clientMessageId,
             runId,
         }));
