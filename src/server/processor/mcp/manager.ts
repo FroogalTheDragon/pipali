@@ -96,6 +96,19 @@ export async function reconnectMcpServer(serverName: string): Promise<void> {
 }
 
 /**
+ * Disconnect a specific MCP server if it is currently active.
+ */
+export async function disconnectMcpServer(serverName: string): Promise<void> {
+    const existingClient = activeClients.get(serverName);
+    if (!existingClient) {
+        return;
+    }
+
+    await existingClient.close();
+    activeClients.delete(serverName);
+}
+
+/**
  * Get all MCP tools as ToolDefinition[] for the director.
  * Each tool's schema is augmented with an `operation_type` property that the agent
  * must specify to indicate whether the tool call is safe or unsafe.

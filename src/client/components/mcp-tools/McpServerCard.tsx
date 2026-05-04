@@ -5,6 +5,8 @@ import type { McpServerInfo, McpConnectionStatus } from '../../types/mcp';
 interface McpServerCardProps {
     server: McpServerInfo;
     onClick?: () => void;
+    onToggleEnabled?: (enabled: boolean) => void;
+    isToggling?: boolean;
 }
 
 function getStatusIcon(status: McpConnectionStatus | undefined, enabled: boolean) {
@@ -37,7 +39,7 @@ const STATUS_KEYS: Record<string, string> = {
     error: 'mcpTools.statusError',
 };
 
-export function McpServerCard({ server, onClick }: McpServerCardProps) {
+export function McpServerCard({ server, onClick, onToggleEnabled, isToggling = false }: McpServerCardProps) {
     const { t } = useTranslation();
     const TransportIcon = server.transportType === 'stdio' ? Terminal : Globe;
     const status = server.connectionStatus;
@@ -62,9 +64,26 @@ export function McpServerCard({ server, onClick }: McpServerCardProps) {
                     <TransportIcon size={12} />
                     <span>{server.transportType}</span>
                 </div>
-                <div className={`mcp-server-status-badge ${statusText}`}>
-                    {getStatusIcon(status, server.enabled)}
-                    <span>{statusLabel}</span>
+                <div className="mcp-server-card-header-actions">
+                    <div className={`mcp-server-status-badge ${statusText}`}>
+                        {getStatusIcon(status, server.enabled)}
+                        <span>{statusLabel}</span>
+                    </div>
+                    <label
+                        className="mcp-card-toggle-switch"
+                        title={server.enabled ? t('mcpTools.disableServer') : t('mcpTools.enableServer')}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={server.enabled}
+                            disabled={isToggling}
+                            aria-label={server.enabled ? t('mcpTools.disableServer') : t('mcpTools.enableServer')}
+                            onChange={(e) => onToggleEnabled?.(e.target.checked)}
+                        />
+                        <span className="mcp-card-toggle-slider"></span>
+                    </label>
                 </div>
             </div>
 

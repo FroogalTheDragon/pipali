@@ -17,7 +17,6 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
     const [path, setPath] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [confirmationMode, setConfirmationMode] = useState<McpConfirmationMode>('always');
-    const [enabled, setEnabled] = useState(true);
     const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([]);
 
     const [isCreating, setIsCreating] = useState(false);
@@ -76,7 +75,6 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
             apiKey: apiKey || undefined,
             env: Object.keys(env).length > 0 ? env : undefined,
             confirmationMode,
-            enabled,
         };
 
         try {
@@ -258,18 +256,6 @@ export function CreateMcpServerModal({ onClose, onCreated }: CreateMcpServerModa
                             {confirmationMode === 'unsafe_only' && t('mcpTools.confirmUnsafeHint')}
                             {confirmationMode === 'never' && t('mcpTools.confirmNeverHint')}
                         </span>
-                    </div>
-
-                    <div className="form-group form-checkbox-group">
-                        <label className="checkbox-label">
-                            <input
-                                type="checkbox"
-                                checked={enabled}
-                                onChange={(e) => setEnabled(e.target.checked)}
-                            />
-                            <span>{t('mcpTools.enableServer')}</span>
-                        </label>
-                        <span className="form-hint">{t('mcpTools.disabledHint')}</span>
                     </div>
 
                     {error && <div className="form-error">{error}</div>}

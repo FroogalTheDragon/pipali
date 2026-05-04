@@ -17,7 +17,6 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
     const [path, setPath] = useState(server.path);
     const [apiKey, setApiKey] = useState(server.apiKey || '');
     const [confirmationMode, setConfirmationMode] = useState<McpConfirmationMode>(server.confirmationMode);
-    const [enabled, setEnabled] = useState(server.enabled);
     const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>(() => {
         if (!server.env) return [];
         return Object.entries(server.env).map(([key, value]) => ({ key, value }));
@@ -45,7 +44,6 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
         if (path !== server.path) return true;
         if (apiKey !== (server.apiKey || '')) return true;
         if (confirmationMode !== server.confirmationMode) return true;
-        if (enabled !== server.enabled) return true;
 
         // Check env vars
         const currentEnv: Record<string, string> = {};
@@ -131,7 +129,6 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
             apiKey: apiKey || undefined,
             env: Object.keys(env).length > 0 ? env : undefined,
             confirmationMode,
-            enabled,
             enabledTools: enabledToolsSet.size > 0 ? Array.from(enabledToolsSet) : undefined,
         };
 
@@ -378,19 +375,6 @@ export function McpServerDetailModal({ server, onClose, onUpdated, onDeleted }: 
                                 {confirmationMode === 'unsafe_only' && t('mcpTools.confirmUnsafeHintLong')}
                                 {confirmationMode === 'never' && t('mcpTools.confirmNeverHintShort')}
                             </span>
-                        </div>
-
-                        <div className="form-group form-toggle-group">
-                            <label htmlFor="server-enabled">{t('mcpTools.enableServerLong')}</label>
-                            <label className="toggle-switch">
-                                <input
-                                    id="server-enabled"
-                                    type="checkbox"
-                                    checked={enabled}
-                                    onChange={(e) => setEnabled(e.target.checked)}
-                                />
-                                <span className="toggle-slider"></span>
-                            </label>
                         </div>
 
                         {/* Test Connection Section */}

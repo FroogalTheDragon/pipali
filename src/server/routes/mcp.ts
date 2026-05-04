@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import {
     loadEnabledMcpServers,
     reconnectMcpServer,
+    disconnectMcpServer,
     getMcpServerStatuses,
     closeMcpClients,
 } from '../processor/mcp';
@@ -165,7 +166,7 @@ mcp.put('/servers/:id', zValidator('json', updateMcpServerSchema), async (c) => 
 
         log.info(`✅ Updated MCP server "${updated.name}"`);
 
-        // Reconnect if enabled
+        // Match the active client registry to the updated enabled state.
         if (updated.enabled) {
             try {
                 await reconnectMcpServer(updated.name);
@@ -173,9 +174,21 @@ mcp.put('/servers/:id', zValidator('json', updateMcpServerSchema), async (c) => 
             } catch (error) {
                 log.warn({ err: error }, 'Failed to reconnect');
             }
+        } else {
+            await disconnectMcpServer(updated.name);
+            log.info(`Disconnected disabled MCP server "${updated.name}"`);
         }
 
-        return c.json({ success: true, server: updated });
+        const statuses = getMcpServerStatuses();
+        const status = statuses.find(s => s.name === updated.name);
+
+        return c.json({
+            success: true,
+            server: {
+                ...updated,
+                connectionStatus: status?.status || 'disconnected',
+            }
+        });
     } catch (error) {
         log.error({ err: error }, 'Failed to update server');
         return c.json({ error: 'Failed to update MCP server' }, 500);

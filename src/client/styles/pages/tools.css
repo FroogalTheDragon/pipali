@@ -137,6 +137,13 @@
     gap: 8px;
 }
 
+.mcp-server-card-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 .mcp-server-card-header-left {
     display: flex;
     align-items: center;
@@ -193,6 +200,54 @@
 .mcp-server-status-badge.error {
     background: var(--color-error-bg);
     color: var(--color-error-text);
+}
+
+.mcp-card-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 20px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.mcp-card-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.mcp-card-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-border);
+    border-radius: 20px;
+    transition: var(--transition);
+}
+
+.mcp-card-toggle-slider:before {
+    position: absolute;
+    content: "";
+    width: 14px;
+    height: 14px;
+    left: 3px;
+    top: 3px;
+    background-color: var(--color-bg);
+    border-radius: 50%;
+    transition: var(--transition);
+}
+
+.mcp-card-toggle-switch input:checked + .mcp-card-toggle-slider {
+    background-color: var(--color-accent);
+}
+
+.mcp-card-toggle-switch input:checked + .mcp-card-toggle-slider:before {
+    transform: translateX(14px);
+}
+
+.mcp-card-toggle-switch input:disabled + .mcp-card-toggle-slider {
+    opacity: 0.55;
+    cursor: wait;
 }
 
 .mcp-server-card-description {
@@ -473,67 +528,6 @@
     border-color: var(--color-accent);
     background: var(--color-bg-muted);
     color: var(--color-text);
-}
-
-/* Enable Server Toggle */
-.form-toggle-group {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.form-toggle-group > label:first-child {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--color-text);
-}
-
-/* Toggle Switch (reused from settings) */
-.mcp-server-form .toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
-    flex-shrink: 0;
-}
-
-.mcp-server-form .toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.mcp-server-form .toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--color-border);
-    transition: var(--transition);
-    border-radius: 24px;
-}
-
-.mcp-server-form .toggle-slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: var(--color-bg);
-    transition: var(--transition);
-    border-radius: 50%;
-}
-
-.mcp-server-form .toggle-switch input:checked + .toggle-slider {
-    background-color: var(--color-accent);
-}
-
-.mcp-server-form .toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(20px);
 }
 
 /* Form Hint */
