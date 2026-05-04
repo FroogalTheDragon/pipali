@@ -1,5 +1,5 @@
-import { serial, text, timestamp, pgTable, pgEnum, uuid, boolean, integer, jsonb, real } from 'drizzle-orm/pg-core';
-import { type ATIFTrajectory } from '../processor/conversation/atif/atif.types';
+import { serial, text, timestamp, pgTable, pgEnum, uuid, boolean, integer, jsonb, real, primaryKey, index } from 'drizzle-orm/pg-core';
+import { type ATIFAgent, type ATIFFinalMetrics, type ATIFStep, type ATIFStepSource, type ATIFTrajectory } from '../processor/conversation/atif/atif.types';
 import { type TriggerConfig, type TriggerEventData } from '../automation/types';
 import { type ConfirmationRequest } from '../processor/confirmation/confirmation.types';
 
@@ -203,7 +203,11 @@ export const agents = pgTable('agents', {
 export const Conversation = pgTable('conversation', {
     id: uuid('id').defaultRandom().notNull().primaryKey(),
     userId: integer('user_id').notNull().references(() => User.id, { onDelete: 'cascade' }),
-    trajectory: jsonb('trajectory').$type<ATIFTrajectory>().notNull(),
+    schemaVersion: text('schema_version').default('ATIF-v1.4').notNull(),
+    sessionId: text('session_id').notNull(),
+    agent: jsonb('agent').$type<ATIFAgent>().notNull(),
+    finalMetrics: jsonb('final_metrics').$type<ATIFFinalMetrics>(),
+    extra: jsonb('extra').$type<Record<string, unknown>>(),
     title: text('title'),
     // Optional link to automation - if set, this conversation belongs to an automation
     automationId: uuid('automation_id'),
@@ -211,6 +215,20 @@ export const Conversation = pgTable('conversation', {
     isPinned: boolean('is_pinned').default(false).notNull(),
     ...dbBaseModel,
 });
+
+export const ConversationStep = pgTable('conversation_step', {
+    conversationId: uuid('conversation_id').notNull().references(() => Conversation.id, { onDelete: 'cascade' }),
+    stepId: integer('step_id').notNull(),
+    source: text('source').$type<ATIFStepSource>().notNull(),
+    timestamp: timestamp('timestamp').notNull(),
+    messagePreview: text('message_preview'),
+    step: jsonb('step').$type<ATIFStep>().notNull(),
+    ...dbBaseModel,
+}, (table) => [
+    primaryKey({ columns: [table.conversationId, table.stepId] }),
+    index('conversation_step_conversation_id_idx').on(table.conversationId),
+    index('conversation_step_source_idx').on(table.source),
+]);
 
 // Web Search Provider Configuration Schema
 export const WebSearchProviderTypeEnum = pgEnum('web_search_provider_type', ['exa', 'serper', 'platform']);
