@@ -487,10 +487,16 @@
         "statusConnected": "connecté",
         "statusConnecting": "connexion...",
         "statusError": "erreur",
+        "confirmBadgePrefix": "Confirmer :",
+        "confirmAlwaysBadge": "Toujours",
+        "confirmUnsafeBadge": "Risque",
+        "confirmNeverBadge": "Jamais",
         "confirmAllBadge": "Tout confirmer",
         "confirmWritesBadge": "Confirmer les écritures",
         "confirmAllTooltip": "Confirmation requise pour toutes les opérations",
-        "confirmWritesTooltip": "Confirmation requise pour les opérations d'écriture"
+        "confirmWritesTooltip": "Confirmation requise pour les opérations d'écriture",
+        "confirmUnsafeTooltip": "Confirmation requise uniquement pour les opérations risquées",
+        "confirmNeverTooltip": "Aucune confirmation requise ; toutes les opérations sont auto-approuvées"
     },
     "errors": {
         "somethingWentWrong": "Une erreur est survenue",

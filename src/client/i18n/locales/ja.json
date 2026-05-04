@@ -487,10 +487,16 @@
         "statusConnected": "接続済み",
         "statusConnecting": "接続中",
         "statusError": "エラー",
+        "confirmBadgePrefix": "確認:",
+        "confirmAlwaysBadge": "常に",
+        "confirmUnsafeBadge": "危険時",
+        "confirmNeverBadge": "なし",
         "confirmAllBadge": "すべて確認",
         "confirmWritesBadge": "書き込みを確認",
         "confirmAllTooltip": "すべての操作に確認が必要です",
-        "confirmWritesTooltip": "書き込み操作に確認が必要です"
+        "confirmWritesTooltip": "書き込み操作に確認が必要です",
+        "confirmUnsafeTooltip": "危険な操作のみ確認が必要です",
+        "confirmNeverTooltip": "確認不要。すべての操作が自動承認されます"
     },
     "errors": {
         "somethingWentWrong": "問題が発生しました",

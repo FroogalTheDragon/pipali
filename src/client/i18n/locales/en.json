@@ -487,10 +487,16 @@
         "statusConnected": "connected",
         "statusConnecting": "connecting",
         "statusError": "error",
+        "confirmBadgePrefix": "Confirm:",
+        "confirmAlwaysBadge": "Always",
+        "confirmUnsafeBadge": "Unsafe",
+        "confirmNeverBadge": "Never",
         "confirmAllBadge": "Confirm all",
         "confirmWritesBadge": "Confirm writes",
         "confirmAllTooltip": "Confirmation required for all operations",
-        "confirmWritesTooltip": "Confirmation required for write operations"
+        "confirmWritesTooltip": "Confirmation required for write operations",
+        "confirmUnsafeTooltip": "Confirmation required only for unsafe operations",
+        "confirmNeverTooltip": "No confirmation required; all operations are auto-approved"
     },
     "errors": {
         "somethingWentWrong": "Something went wrong",

@@ -487,10 +487,16 @@
         "statusConnected": "已连接",
         "statusConnecting": "连接中",
         "statusError": "错误",
+        "confirmBadgePrefix": "确认：",
+        "confirmAlwaysBadge": "始终",
+        "confirmUnsafeBadge": "危险",
+        "confirmNeverBadge": "从不",
         "confirmAllBadge": "全部确认",
         "confirmWritesBadge": "确认写入",
         "confirmAllTooltip": "所有操作需要确认",
-        "confirmWritesTooltip": "写入操作需要确认"
+        "confirmWritesTooltip": "写入操作需要确认",
+        "confirmUnsafeTooltip": "仅危险操作需要确认",
+        "confirmNeverTooltip": "无需确认；所有操作自动批准"
     },
     "errors": {
         "somethingWentWrong": "出了点问题",

@@ -487,10 +487,16 @@
         "statusConnected": "verbunden",
         "statusConnecting": "verbinde",
         "statusError": "Fehler",
+        "confirmBadgePrefix": "Bestätigen:",
+        "confirmAlwaysBadge": "Immer",
+        "confirmUnsafeBadge": "Unsicher",
+        "confirmNeverBadge": "Nie",
         "confirmAllBadge": "Alles bestätigen",
         "confirmWritesBadge": "Schreibvorgänge bestätigen",
         "confirmAllTooltip": "Bestätigung für alle Vorgänge erforderlich",
-        "confirmWritesTooltip": "Bestätigung für Schreibvorgänge erforderlich"
+        "confirmWritesTooltip": "Bestätigung für Schreibvorgänge erforderlich",
+        "confirmUnsafeTooltip": "Bestätigung nur für unsichere Vorgänge erforderlich",
+        "confirmNeverTooltip": "Keine Bestätigung erforderlich; alle Vorgänge werden automatisch genehmigt"
     },
     "errors": {
         "somethingWentWrong": "Etwas ist schiefgelaufen",
