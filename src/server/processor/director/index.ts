@@ -296,8 +296,8 @@ REQUIRED:
                 command: {
                     type: 'string',
                     description: process.platform === 'win32'
-                        ? 'The PowerShell command to execute.'
-                        : 'The bash command to execute.',
+                        ? 'The PowerShell command to execute. Escape literal `$` to prevent expansion.'
+                        : 'The bash command to execute. Escape literal `$` to prevent expansion.',
                 },
                 operation_type: {
                     type: 'string',
