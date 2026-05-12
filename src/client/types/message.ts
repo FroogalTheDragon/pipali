@@ -30,4 +30,5 @@ export type Thought = {
     toolResult?: string;
     isInternalThought?: boolean; // True for model's internal reasoning (rendered in italics)
     isPending?: boolean; // True for tool calls that are currently executing (no results yet)
+    stepGroupId?: string; // Groups flattened thoughts/tool calls that came from the same trajectory step
 };

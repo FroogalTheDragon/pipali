@@ -752,14 +752,15 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         case 'STEP_START': {
             const { conversationId, runId, thought, message: reasoning, toolCalls } = action;
             const isCurrentConversation = conversationId === state.conversationId;
+            const stepGroupId = toolCalls?.[0]?.tool_call_id || generateUUID();
 
             const newThoughts: Thought[] = [];
 
             // Add reasoning thought if present
             if (reasoning && toolCalls?.length > 0) {
-                newThoughts.push({ id: generateDeterministicId('thought', reasoning), type: 'thought', content: reasoning });
+                newThoughts.push({ id: generateDeterministicId('thought', reasoning), type: 'thought', content: reasoning, stepGroupId });
             } else if (thought) {
-                newThoughts.push({ id: generateDeterministicId('thought', thought), type: 'thought', content: thought, isInternalThought: true });
+                newThoughts.push({ id: generateDeterministicId('thought', thought), type: 'thought', content: thought, isInternalThought: true, stepGroupId });
             }
 
             // Add pending tool calls
@@ -771,6 +772,7 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
                     toolName: tc.function_name,
                     toolArgs: tc.arguments,
                     isPending: true,
+                    stepGroupId,
                 });
             }
 
